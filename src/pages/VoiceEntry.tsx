@@ -105,12 +105,33 @@ export default function VoiceEntry() {
 
   const filterByField = (parsed: any, field: string) => {
     switch (field) {
-      case "name":     return { patient_name: parsed.patient_name };
-      case "age":      return { age: parsed.age };
-      case "bp":       return { bp_sys: parsed.bp_sys, bp_dia: parsed.bp_dia };
-      case "weight":   return { weight_kg: parsed.weight_kg };
-      case "symptoms": return { symptoms: parsed.symptoms };
-      default:         return parsed;
+      case "name":
+        return { patient_name: parsed.patient_name || parsed.raw_text.trim() };
+      case "age":
+        let ageVal = parsed.age;
+        if (!ageVal) {
+          const m = parsed.raw_text.match(/\d+/);
+          if (m) ageVal = m[0];
+        }
+        return { age: ageVal };
+      case "bp":
+        let sys = parsed.bp_sys, dia = parsed.bp_dia;
+        if (!sys || !dia) {
+          const m = parsed.raw_text.match(/(\d{2,3})\D+(\d{2,3})/);
+          if (m) { sys = m[1]; dia = m[2]; }
+        }
+        return { bp_sys: sys, bp_dia: dia };
+      case "weight":
+        let w = parsed.weight_kg;
+        if (!w) {
+          const m = parsed.raw_text.match(/\d+(\.\d+)?/);
+          if (m) w = m[0];
+        }
+        return { weight_kg: w };
+      case "symptoms":
+        return { symptoms: parsed.symptoms?.length > 0 ? parsed.symptoms : (parsed.raw_text.trim() ? [parsed.raw_text.trim()] : []) };
+      default:
+        return parsed;
     }
   };
 
