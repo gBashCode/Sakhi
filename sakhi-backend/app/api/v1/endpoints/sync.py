@@ -9,9 +9,9 @@ from app.models.user import User
 from app.models.visit import Visit
 from app.schemas.sync import SyncRequest, SyncResponse
 from app.core.config import settings
+from app.core.redis_client import r
 
 router = APIRouter()
-r = redis.from_url(settings.REDIS_URL)
 
 @router.post("/sync", response_model=SyncResponse)
 def sync_visits(data: SyncRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
