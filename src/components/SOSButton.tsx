@@ -21,12 +21,14 @@ export default function SOSButton() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-24 right-4 z-[45] flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-red-600/30 transition-transform active:scale-95 animate-pulse"
-      >
-        <ShieldAlert className="h-7 w-7" />
-      </button>
+      <div className="fixed bottom-24 left-0 right-0 mx-auto w-full max-w-md z-[45] pointer-events-none flex justify-end px-4">
+        <button
+          onClick={() => setOpen(true)}
+          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-red-600/30 transition-transform active:scale-95 animate-pulse"
+        >
+          <ShieldAlert className="h-7 w-7" />
+        </button>
+      </div>
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
