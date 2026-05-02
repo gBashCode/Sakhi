@@ -5,6 +5,7 @@ import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import OfflineBadge from "@/components/OfflineBadge";
 import ActionCard from "@/components/ActionCard";
+import SOSButton from "@/components/SOSButton";
 
 export default function Home() {
   const nav = useNavigate();
@@ -35,6 +36,11 @@ export default function Home() {
           <p className="text-xs text-muted-foreground mt-0.5">{t.asha} • Tumkur</p>
         </div>
         <OfflineBadge />
+      </div>
+
+      {/* SOS Button */}
+      <div className="mt-5">
+        <SOSButton />
       </div>
 
       {/* Stats */}

@@ -21,14 +21,13 @@ export default function SOSButton() {
 
   return (
     <>
-      <div className="fixed bottom-24 left-0 right-0 mx-auto w-full max-w-md z-[45] pointer-events-none flex justify-end px-4">
-        <button
-          onClick={() => setOpen(true)}
-          className="pointer-events-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-600 text-white shadow-lg ring-4 ring-red-600/30 transition-transform active:scale-95 animate-pulse"
-        >
-          <ShieldAlert className="h-7 w-7" />
-        </button>
-      </div>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center justify-center gap-2 rounded-2xl bg-red-600/10 p-4 text-red-600 border border-red-600/20 active:scale-[0.98] transition-transform shadow-sm"
+      >
+        <ShieldAlert className="h-6 w-6" />
+        <span className="font-bold text-lg tracking-wide">Emergency SOS</span>
+      </button>
 
       {open && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
