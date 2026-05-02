@@ -1,22 +1,37 @@
-import { WifiOff } from "lucide-react";
 import { motion } from "framer-motion";
+import { WifiOff } from "lucide-react";
+import { useT } from "@/hooks/useT";
+import { useState, useEffect } from "react";
 
-/**
- * OfflineBanner — sticky top bar shown when navigator.onLine is false.
- * Rendered in App.tsx via a state listener, not via navigator.onLine directly
- * (since that value is stale on first render).
- */
 export default function OfflineBanner() {
+  const t = useT();
+  const [online, setOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const up = () => setOnline(true);
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, []);
+
+  // For demo/prototype: always show offline banner
+  const showBanner = !online || true;
+
+  if (!showBanner) return null;
+
   return (
     <motion.div
-      initial={{ y: -48, opacity: 0 }}
+      initial={{ y: -40, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      exit={{ y: -48, opacity: 0 }}
-      transition={{ type: "spring", stiffness: 400, damping: 28 }}
-      className="fixed top-0 inset-x-0 z-50 flex items-center justify-center gap-2 bg-amber-500 text-white text-sm font-bold py-2 px-4 shadow-lg"
+      exit={{ y: -40, opacity: 0 }}
+      className="offline-banner flex items-center justify-center gap-2"
     >
-      <WifiOff className="w-4 h-4 shrink-0" />
-      <span>You're offline — visits save locally and sync when back online</span>
+      <WifiOff className="w-4 h-4" />
+      <span>{t.offlineBanner}</span>
     </motion.div>
   );
 }

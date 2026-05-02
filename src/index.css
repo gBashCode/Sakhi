@@ -51,12 +51,15 @@
     --gradient-accent: linear-gradient(135deg, hsl(19 65% 56%) 0%, hsl(28 75% 62%) 100%);
     --gradient-mic: radial-gradient(circle at 50% 50%, hsl(172 70% 42%) 0%, hsl(175 78% 26%) 60%, hsl(178 60% 14%) 100%);
     --gradient-hero: linear-gradient(180deg, hsl(42 67% 96%) 0%, hsl(40 55% 92%) 50%, hsl(40 50% 88%) 100%);
+    --gradient-danger: linear-gradient(135deg, hsl(0 73% 50%) 0%, hsl(15 70% 45%) 100%);
 
     /* Shadows */
     --shadow-soft: 0 4px 16px -4px hsl(178 60% 14% / 0.08);
     --shadow-card: 0 10px 32px -12px hsl(178 60% 14% / 0.18);
     --shadow-glow: 0 0 60px -10px hsl(172 70% 42% / 0.55);
     --shadow-mic: 0 20px 60px -12px hsl(175 78% 26% / 0.5);
+    --shadow-danger: 0 20px 60px -12px hsl(0 73% 50% / 0.5);
+    --shadow-field-glow: 0 0 20px -4px hsl(172 70% 42% / 0.6);
 
     --transition-smooth: cubic-bezier(0.22, 1, 0.36, 1);
   }
@@ -94,4 +97,120 @@
   .stat-pill {
     @apply rounded-2xl px-3 py-2 bg-card/70 border border-border/50;
   }
+
+  /* ── Offline Banner ── */
+  .offline-banner {
+    @apply w-full py-2.5 text-center text-sm font-bold tracking-wider;
+    background: var(--gradient-danger);
+    color: hsl(var(--destructive-foreground));
+  }
+
+  /* ── Risk Badges ── */
+  .risk-low {
+    @apply bg-success/15 text-success border border-success/30;
+  }
+  .risk-medium {
+    @apply bg-warning/15 text-warning border border-warning/30;
+  }
+  .risk-high {
+    @apply bg-destructive/15 text-destructive border border-destructive/30;
+  }
+
+  /* ── Field glow when voice fills ── */
+  .field-glow {
+    box-shadow: var(--shadow-field-glow);
+    border-color: hsl(var(--primary-glow)) !important;
+  }
+
+  /* ── Progress bar ── */
+  .progress-bar {
+    @apply h-3 rounded-full bg-muted overflow-hidden;
+  }
+  .progress-fill {
+    @apply h-full rounded-full transition-all duration-700;
+    background: var(--gradient-primary);
+  }
+
+  /* ── Urgent alert background ── */
+  .urgent-bg {
+    background:
+      radial-gradient(circle at 50% 30%, hsl(0 73% 60% / 0.3) 0%, transparent 60%),
+      radial-gradient(circle at 20% 80%, hsl(0 73% 50% / 0.2) 0%, transparent 50%),
+      linear-gradient(180deg, hsl(0 73% 12%) 0%, hsl(0 60% 8%) 100%);
+  }
+
+  /* ── Waveform bars ── */
+  .waveform-bar {
+    @apply w-1 bg-primary rounded-full;
+    animation: waveform-dance 0.8s ease-in-out infinite;
+  }
+
+  /* ── FAB ── */
+  .fab {
+    @apply fixed bottom-24 right-5 w-16 h-16 rounded-full flex items-center justify-center z-30;
+    background: var(--gradient-primary);
+    box-shadow: var(--shadow-mic);
+  }
+
+  /* ── Search bar ── */
+  .search-bar {
+    @apply flex items-center gap-3 bg-card/60 backdrop-blur rounded-2xl px-4 py-3.5 border border-border/60;
+  }
+
+  /* ── Filter tab ── */
+  .filter-tab {
+    @apply px-5 py-2.5 rounded-2xl text-sm font-bold transition-all;
+    min-height: 48px;
+  }
+  .filter-tab-active {
+    @apply bg-primary text-primary-foreground shadow-glow;
+  }
+  .filter-tab-inactive {
+    @apply bg-card/60 text-muted-foreground border border-border/50;
+  }
+
+  /* ── Due card urgency colors ── */
+  .due-soon {
+    @apply border-l-4 border-l-warning;
+  }
+  .due-today {
+    @apply border-l-4 border-l-accent;
+  }
+  .due-overdue {
+    @apply border-l-4 border-l-destructive;
+  }
+}
+
+@layer utilities {
+  .min-tap {
+    min-width: 48px;
+    min-height: 48px;
+  }
+}
+
+/* ── Keyframe: waveform dance ── */
+@keyframes waveform-dance {
+  0%, 100% { height: 8px; }
+  50% { height: 28px; }
+}
+
+/* ── Keyframe: urgent pulse ── */
+@keyframes urgent-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Keyframe: field glow animation ── */
+@keyframes glow-field {
+  0% { box-shadow: 0 0 0 0 hsl(172 70% 42% / 0.5); }
+  50% { box-shadow: 0 0 24px 4px hsl(172 70% 42% / 0.4); }
+  100% { box-shadow: 0 0 0 0 hsl(172 70% 42% / 0); }
+}
+
+.animate-glow-field {
+  animation: glow-field 1.5s ease-in-out;
+}
+
+.animate-urgent-pulse {
+  animation: urgent-pulse 1.5s ease-in-out infinite;
 }
