@@ -1,12 +1,13 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Activity, Heart } from "lucide-react";
+import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
 import { useVoice } from "@/hooks/useVoice";
 import { db } from "@/lib/db";
 import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
+import { triageRisk } from "@/agents/riskAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
@@ -33,14 +34,26 @@ export default function VisitForm() {
   const [symptoms, setSymptoms] = useState("");
   const [risk, setRisk] = useState<Risk>("low");
   const [glowField, setGlowField] = useState<string | null>(null);
+  // Triage state from riskAgent
+  const [triage, setTriage] = useState<{
+    level: string; reasons: string[]; protocol: string; urgency: string;
+  } | null>(null);
 
   // ── useVoice hook (real Whisper transcription) ────────────────────────────
   const { recording, transcribing, transcript, start, stop } = useVoice();
 
-  // ── Risk: recalculate on BP / symptom change ──────────────────────────────
+  // ── Risk + Triage: recalculate on BP / symptom change ───────────────────
   useEffect(() => {
-    setRisk(calcRisk(parseInt(bpSys) || null, parseInt(bpDia) || null, symptoms));
-  }, [bpSys, bpDia, symptoms]);
+    const sys = parseInt(bpSys) || null;
+    const dia = parseInt(bpDia) || null;
+    const sympArr = symptoms ? symptoms.split(", ").filter(Boolean) : [];
+    setRisk(nerCalcRisk(sys, dia, sympArr) as Risk);
+    // Run full MoHFW triage
+    const wt = parseFloat(weight) || null;
+    const age = patient?.age ? parseInt(patient.age) : null;
+    const t2 = triageRisk({ bp_sys: sys, bp_dia: dia, weight_kg: wt, symptoms: sympArr, age });
+    setTriage(t2);
+  }, [bpSys, bpDia, symptoms, weight, patient]);
 
   // ── Glow clear ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -150,11 +163,39 @@ export default function VisitForm() {
 
       {/* ── Form fields ────────────────────────────────────────────────── */}
       <div className="mt-6 space-y-4">
-        {/* Risk badge */}
+        {/* Risk badge + Triage protocol banner */}
         <div className="flex items-center justify-between">
           <span className="text-sm font-bold text-muted-foreground">{t.riskLevel}</span>
           <RiskBadge risk={risk} size="md" />
         </div>
+
+        {/* Protocol banner — appears as soon as triage fires */}
+        {triage && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            data-testid="triage-protocol"
+            className={`rounded-2xl px-4 py-3 flex items-start gap-3 border ${
+              triage.level === "high"
+                ? "bg-destructive/10 border-destructive/30 text-destructive"
+                : triage.level === "medium"
+                ? "bg-accent/10 border-accent/30 text-accent"
+                : "bg-primary/10 border-primary/20 text-primary"
+            }`}
+          >
+            {triage.level === "high" ? (
+              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0">
+              <div className="font-bold text-sm leading-tight">{triage.protocol}</div>
+              <div className="text-xs mt-0.5 opacity-80">
+                {triage.reasons.join(" · ")}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* BP row */}
         <div className="flex gap-3">
