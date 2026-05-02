@@ -1,82 +1,99 @@
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
+import { pipeline, env } from '@xenova/transformers';
+
+// Configuration for offline-first operation
+env.allowLocalModels = true;
+env.allowRemoteModels = true; 
+env.backends.onnx.wasm.numThreads = 1;
+
+// CRITICAL: Point to the wasm files in the public folder
+env.backends.onnx.wasm.wasmPaths = '/wasm/';
+
+let hfPipeline = null;
+let modelStatus = 'idle'; 
 
 /**
- * 🚀 NATIVE OFFLINE STT AGENT
- * Uses the phone's native Android Speech Engine.
- * Works 100% offline IF the Hindi/Kannada voice pack is on the phone.
- * No 140MB download needed!
+ * REVERTED TO ON-DEVICE WHISPER (WHISPER-TINY)
+ * This avoids the Google Assistant popup and runs 100% inside the app.
  */
-
-export async function initSTT() {
+export async function initSTT(progressCallback = null) {
+  if (hfPipeline) return hfPipeline;
+  modelStatus = 'loading';
   try {
-    const perm = await SpeechRecognition.requestPermissions();
-    return perm.speech === 'granted';
+    hfPipeline = await pipeline(
+      'automatic-speech-recognition',
+      'Xenova/whisper-tiny', 
+      {
+        quantized: true,
+        progress_callback: (p) => {
+          if (progressCallback && p.status === 'progress') progressCallback(Math.round(p.progress));
+        }
+      }
+    );
+    modelStatus = 'ready';
+    return hfPipeline;
   } catch (e) {
-    console.error('Speech permissions failed:', e);
-    return false;
+    modelStatus = 'error';
+    console.error('STT Init failed:', e);
+    throw e;
   }
 }
 
-export function getModelStatus() { return 'ready'; }
-export function isModelReady() { return true; }
+export function getModelStatus() { return modelStatus; }
+export function isModelReady() { return modelStatus === 'ready'; }
 
 export async function transcribeRegional(language = 'hi-IN') {
   return new Promise(async (resolve) => {
+    // Check if model is ready
+    if (modelStatus !== 'ready') {
+      console.warn('Whisper not ready. Status:', modelStatus);
+      resolve(''); 
+      return;
+    }
+
+    const whisperLang = language.startsWith('kn') ? 'kannada' : 'hindi';
+
     try {
-      // 1. Check if available
-      const { available } = await SpeechRecognition.available();
-      if (!available) {
-        console.warn('Native Speech not available');
-        resolve('');
-        return;
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
 
-      // 2. Start Listening
-      let resolved = false;
-      
-      await SpeechRecognition.start({
-        language: language,
-        maxResults: 1,
-        prompt: "Boliye...",
-        partialResults: false,
-        popup: true, // Shows the native Google Listening UI (best for offline)
-      });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
-      // 3. Handle Result via Listener
-      const listener = await SpeechRecognition.addListener('partialResults', (data) => {
-        if (data.matches && data.matches.length > 0 && !resolved) {
-          resolved = true;
-          resolve(data.matches[0]);
-          SpeechRecognition.stop();
-        }
-      });
-
-      // Since we use popup: true, most Androids return the result directly or via listener
-      // We also add a timeout safety
-      setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          SpeechRecognition.stop();
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        try {
+          const text = await transcribeOnDevice(blob, whisperLang);
+          resolve(text);
+        } catch (err) {
           resolve('');
         }
-      }, 10000);
-
+      };
+      
+      recorder.start();
+      // Record for 6 seconds
+      setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 6000);
     } catch (e) {
-      console.error('Native STT failed:', e);
       resolve('');
     }
   });
 }
 
-// Fallback for web/debug
-export function stopListening() {
-  SpeechRecognition.stop();
+export async function transcribeOnDevice(audioBlob, language = 'hindi') {
+  const stt = await initSTT();
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  const audioData = audioBuffer.getChannelData(0);
+
+  const output = await stt(audioData, {
+    chunk_length_s: 30,
+    stride_length_s: 5,
+    language: language,
+    task: 'transcribe',
+    return_timestamps: false,
+  });
+  return output.text.trim();
 }
 
-/**
- * Helper to check if offline packs are needed
- */
-export async function checkOfflinePacks() {
-  const { languages } = await SpeechRecognition.getSupportedLanguages();
-  return languages;
-}
+export function stopListening() {}
