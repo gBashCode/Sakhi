@@ -11,6 +11,10 @@ import { transcribeRegional, getModelStatus } from "@/agents/sttAgent";
 import { parseMedical } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
 import { getNextAction } from "@/agents/copilotAgent";
+import { generateAllDocuments } from "@/agents/documentAgent";
+import { saveToPhone } from "@/lib/filesystem";
+import { Download, Share2, FileText } from "lucide-react";
+
 
 type Phase = "idle" | "speaking" | "listening" | "processing" | "result";
 
@@ -55,7 +59,9 @@ export default function VoiceEntry() {
     patient_name: null, age: null, bp_sys: null, bp_dia: null, weight_kg: null, symptoms: [],
   });
   const [finalPatient, setFinalPatient] = useState<Patient | null>(null);
+  const [docs, setDocs] = useState<any>(null);
   const modelLoading = getModelStatus() === "loading";
+
 
   // Ref to avoid stale closures in buildResult
   const medRef = useRef(medicalData);
@@ -135,6 +141,11 @@ export default function VoiceEntry() {
     };
 
     setFinalPatient(newPatient);
+    
+    // GENERATE DOCUMENTS
+    const generatedDocs = generateAllDocuments({}, md, risk, action);
+    setDocs(generatedDocs);
+
     setPhase("result");
   };
 
@@ -302,6 +313,52 @@ export default function VoiceEntry() {
                   </div>
                   <p className="font-semibold text-sm">{finalPatient.recommendation}</p>
                 </div>
+
+                {/* DOCUMENT DOWNLOAD BUTTONS */}
+                {docs && (
+                  <div className="glass-card p-4 space-y-3 border-dashed border-primary/30">
+                    <div className="flex items-center gap-2 mb-1">
+                      <FileText className="w-4 h-4 text-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Generated Documents</span>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => saveToPhone(docs.ancCardPDF, `ANC_Card_${finalPatient.name}.pdf`)}
+                        className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-primary/20 py-3 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5" /> ANC Card
+                      </button>
+                      
+                      <button
+                        onClick={() => saveToPhone(docs.registerExcel, `Register_${finalPatient.name}.xlsx`)}
+                        className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-primary/20 py-3 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Register (XLS)
+                      </button>
+
+                      {docs.referralSlipPDF && (
+                        <div className="w-full flex gap-2">
+                          <button
+                            onClick={() => saveToPhone(docs.referralSlipPDF, `Referral_${finalPatient.name}.pdf`)}
+                            className="flex-1 flex items-center justify-center gap-2 bg-destructive/10 border border-destructive/20 py-3 rounded-xl text-xs font-bold text-destructive shadow-sm active:scale-95"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Referral Slip
+                          </button>
+                          <button
+                            onClick={() => {
+                              const sms = `tel:?body=${encodeURIComponent(docs.smsText)}`;
+                              window.location.href = `sms:?body=${encodeURIComponent(docs.smsText)}`;
+                            }}
+                            className="w-12 flex items-center justify-center bg-primary text-white rounded-xl shadow-sm active:scale-95"
+                          >
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <button onClick={save}
                   className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl flex items-center justify-center gap-2">
