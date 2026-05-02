@@ -12,7 +12,7 @@ export function ProtectedRoute() {
 export function AdminProtectedRoute() {
   const adminLoggedIn = useStore((s) => s.adminLoggedIn);
   if (!adminLoggedIn) {
-    return <Navigate to="/admin/login" replace />;
+    return <Navigate to="/login" replace />;
   }
   return <Outlet />;
 }

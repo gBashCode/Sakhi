@@ -23,7 +23,6 @@ import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
-import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import { ProtectedRoute, AdminProtectedRoute } from "./components/ProtectedRoute";
 
@@ -50,8 +49,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin" element={<Navigate to="/login" replace />} />
             <Route element={<AdminProtectedRoute />}>
               <Route path="/admin/dashboard" element={<AdminDashboard />} />
             </Route>
