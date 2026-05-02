@@ -25,7 +25,6 @@ import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
 import AdminDashboard from "./pages/AdminDashboard";
 import { ProtectedRoute, AdminProtectedRoute } from "./components/ProtectedRoute";
-import SOSButton from "./components/SOSButton";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +32,6 @@ const MobileLayout = () => (
   <div className="mx-auto max-w-md min-h-screen bg-background relative shadow-2xl overflow-hidden">
     <OfflineBanner />
     <Outlet />
-    <SOSButton />
     <BottomNav />
   </div>
 );

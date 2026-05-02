@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import type { Lang } from "./i18n";
 
 /* ── Types ── */
@@ -244,8 +245,10 @@ const initialVisits: Visit[] = [
 ];
 
 /* ── Store ── */
-export const useStore = create<Store>((set) => ({
-  /* auth */
+export const useStore = create<Store>()(
+  persist(
+    (set) => ({
+      /* auth */
   lang: (localStorage.getItem("ss_lang") as Lang) || "en",
   setLang: (l) => {
     localStorage.setItem("ss_lang", l);
@@ -305,4 +308,16 @@ export const useStore = create<Store>((set) => ({
   /* demo */
   isDemo: new URLSearchParams(window.location.search).has("demo"),
   setDemo: (v) => set({ isDemo: v }),
-}));
+    }),
+    {
+      name: "sakhi-storage",
+      partialize: (state) => ({
+        loggedIn: state.loggedIn,
+        adminLoggedIn: state.adminLoggedIn,
+        userName: state.userName,
+        patients: state.patients,
+        visits: state.visits,
+      }),
+    }
+  )
+);
