@@ -4,17 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ShieldAlert, KeyRound, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { useStore } from "@/lib/store";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const setAdminLoggedIn = useStore(s => s.setAdminLoggedIn);
   const [adminId, setAdminId] = useState("");
   const [showOtp, setShowOtp] = useState(false);
   const [otp, setOtp] = useState("");
 
   const handleSendOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminId.length < 5) {
-      toast.error("Please enter a valid Admin ID.");
+    if (adminId !== "8585858585") {
+      toast.error("Invalid Admin ID. Try 8585858585.");
       return;
     }
     // Simulate sending OTP
@@ -24,11 +26,12 @@ export default function AdminLogin() {
 
   const handleVerifyOtp = (e: React.FormEvent) => {
     e.preventDefault();
-    if (otp === "1234") {
+    if (otp === "8585") {
       toast.success("Verified successfully");
+      setAdminLoggedIn(true);
       navigate("/admin/dashboard");
     } else {
-      toast.error("Invalid OTP. Try '1234'.");
+      toast.error("Invalid password. Try '8585'.");
     }
   };
 

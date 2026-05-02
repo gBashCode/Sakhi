@@ -57,6 +57,8 @@ type Store = {
   setLoggedIn: (v: boolean) => void;
   userName: string;
   setUserName: (n: string) => void;
+  adminLoggedIn: boolean;
+  setAdminLoggedIn: (v: boolean) => void;
 
   /* ── patients ── */
   patients: Patient[];
@@ -256,6 +258,8 @@ export const useStore = create<Store>((set) => ({
     localStorage.setItem("sakhi_username", n);
     set({ userName: n });
   },
+  adminLoggedIn: false,
+  setAdminLoggedIn: (v) => set({ adminLoggedIn: v }),
 
   /* patients */
   patients: initialPatients,
