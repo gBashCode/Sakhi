@@ -1,67 +1,132 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { CloudUpload, CheckCircle2, Clock } from "lucide-react";
+import { CloudUpload, CheckCircle2, Clock, RefreshCw, Wifi, AlertCircle } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
 
 export default function Sync() {
   const t = useT();
-  const patients = useStore((s) => s.patients);
-  const syncAll = useStore((s) => s.syncAll);
+  const { patients, visits, syncAll, lastSyncTime, failedSyncs, retrySync, settings } = useStore();
   const [syncing, setSyncing] = useState(false);
-  const pending = patients.filter((p) => !p.synced);
+  const [progress, setProgress] = useState(0);
+
+  const pendingPatients = patients.filter((p) => !p.synced);
+  const pendingVisits = visits.filter((v) => !v.synced);
+  const totalPending = pendingPatients.length + pendingVisits.length;
 
   const start = () => {
     setSyncing(true);
+    setProgress(0);
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) { clearInterval(interval); return 100; }
+        return p + 8;
+      });
+    }, 150);
     setTimeout(() => {
+      clearInterval(interval);
+      setProgress(100);
       syncAll();
       setSyncing(false);
-      toast.success(t.synced);
-    }, 1800);
+      toast.success(t.syncSuccess);
+    }, 2000);
+  };
+
+  const handleRetry = () => {
+    retrySync();
+    toast.success(t.syncSuccess);
+  };
+
+  const formatTime = (ts: number | null) => {
+    if (!ts) return t.never;
+    const d = new Date(ts);
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
   return (
-    <div className="min-h-screen pb-32 px-5 pt-10">
+    <div className="min-h-screen pb-32 px-5 pt-6">
       <h1 className="text-3xl font-display text-primary">{t.sync}</h1>
-      <p className="text-muted-foreground text-sm">{pending.length} {t.pending}</p>
+      <p className="text-muted-foreground text-sm">{totalPending} {t.pending}</p>
 
+      {/* Last sync */}
+      <div className="mt-4 glass-card p-4 flex items-center gap-3">
+        <Clock className="w-5 h-5 text-muted-foreground" />
+        <div className="flex-1">
+          <div className="text-xs text-muted-foreground font-semibold">{t.lastSynced}</div>
+          <div className="font-bold text-foreground">{formatTime(lastSyncTime)}</div>
+        </div>
+        {settings.syncOnWifiOnly && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Wifi className="w-3 h-3" /> WiFi only
+          </div>
+        )}
+      </div>
+
+      {/* Progress bar */}
+      {syncing && (
+        <div className="mt-4">
+          <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
+            <span>{t.syncProgress}</span>
+            <span>{Math.min(progress, 100)}%</span>
+          </div>
+          <div className="progress-bar">
+            <motion.div className="progress-fill" style={{ width: `${Math.min(progress, 100)}%` }} />
+          </div>
+        </div>
+      )}
+
+      {/* Sync button */}
       <motion.button
         whileTap={{ scale: 0.97 }}
         onClick={start}
-        disabled={syncing || pending.length === 0}
-        className="mt-6 w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 disabled:opacity-50"
+        disabled={syncing || totalPending === 0}
+        className="mt-5 w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 disabled:opacity-50 min-tap"
       >
         <CloudUpload className={`w-6 h-6 ${syncing ? "animate-bounce" : ""}`} />
         {syncing ? t.syncing : t.syncNow}
       </motion.button>
 
+      {/* Retry failed */}
+      {failedSyncs > 0 && (
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          whileTap={{ scale: 0.97 }}
+          onClick={handleRetry}
+          className="mt-3 w-full glass-card p-4 flex items-center justify-center gap-2 border-destructive/30 min-tap"
+        >
+          <RefreshCw className="w-5 h-5 text-destructive" />
+          <span className="font-bold text-destructive">{t.retrySync}</span>
+          <span className="text-xs text-muted-foreground ml-1">({failedSyncs} {t.failedUploads})</span>
+        </motion.button>
+      )}
+
+      {/* Records list */}
       <div className="mt-6 space-y-3">
-        {patients.map((p, i) => (
+        {[...pendingVisits.map((v) => ({ id: v.id, label: `Visit - ${v.symptoms?.slice(0, 30)}`, synced: v.synced })),
+          ...pendingPatients.map((p) => ({ id: p.id, label: p.name, synced: p.synced })),
+          ...patients.filter((p) => p.synced).slice(0, 3).map((p) => ({ id: p.id, label: p.name, synced: true })),
+        ].map((item, i) => (
           <motion.div
-            key={p.id}
+            key={item.id + i}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
+            transition={{ delay: i * 0.04 }}
             className="glass-card p-4 flex items-center gap-3"
           >
-            <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-                p.synced ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
-              }`}
-            >
-              {p.synced ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+              item.synced ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
+            }`}>
+              {item.synced ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-bold text-foreground truncate">{p.name}</div>
-              <div className="text-xs text-muted-foreground truncate">{p.symptoms}</div>
+              <div className="font-bold text-foreground truncate">{item.label}</div>
             </div>
-            <span
-              className={`text-[11px] font-bold px-2 py-1 rounded-full ${
-                p.synced ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
-              }`}
-            >
-              {p.synced ? "✓" : "•"}
+            <span className={`text-[11px] font-bold px-2 py-1 rounded-full ${
+              item.synced ? "bg-success/15 text-success" : "bg-accent/15 text-accent"
+            }`}>
+              {item.synced ? "✓" : "•"}
             </span>
           </motion.div>
         ))}

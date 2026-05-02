@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { User, Globe, LogOut, MapPin, Award, ChevronRight } from "lucide-react";
+import { User, Globe, LogOut, MapPin, Award, ChevronRight, Settings, BarChart3 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 
@@ -10,13 +10,15 @@ export default function Profile() {
   const { setLoggedIn, patients } = useStore();
 
   const items = [
-    { icon: Globe, label: "Language", value: "Change", onClick: () => nav("/language") },
-    { icon: MapPin, label: "Village", value: "Tumkur, KA" },
-    { icon: Award, label: "Records", value: `${patients.length} patients` },
+    { icon: Globe, label: t.language, value: t.change, onClick: () => nav("/language") },
+    { icon: MapPin, label: t.village, value: "Tumkur, KA" },
+    { icon: Award, label: t.records, value: `${patients.length} ${t.patients}` },
+    { icon: Settings, label: t.settings, value: "", onClick: () => nav("/settings") },
+    { icon: BarChart3, label: t.metrics, value: "Admin", onClick: () => nav("/metrics") },
   ];
 
   return (
-    <div className="min-h-screen pb-32 px-5 pt-10">
+    <div className="min-h-screen pb-32 px-5 pt-6">
       <h1 className="text-3xl font-display text-primary">{t.profile}</h1>
 
       <motion.div
@@ -41,14 +43,14 @@ export default function Profile() {
             transition={{ delay: i * 0.06 }}
             whileTap={{ scale: 0.98 }}
             onClick={it.onClick}
-            className="w-full glass-card p-4 flex items-center gap-3"
+            className="w-full glass-card p-4 flex items-center gap-3 min-tap"
           >
             <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
               <it.icon className="w-5 h-5" />
             </div>
             <div className="flex-1 text-left">
               <div className="font-bold text-foreground">{it.label}</div>
-              <div className="text-xs text-muted-foreground">{it.value}</div>
+              {it.value && <div className="text-xs text-muted-foreground">{it.value}</div>}
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </motion.button>
@@ -56,16 +58,13 @@ export default function Profile() {
 
         <motion.button
           whileTap={{ scale: 0.98 }}
-          onClick={() => {
-            setLoggedIn(false);
-            nav("/");
-          }}
-          className="w-full glass-card p-4 flex items-center gap-3 border-destructive/30"
+          onClick={() => { setLoggedIn(false); nav("/"); }}
+          className="w-full glass-card p-4 flex items-center gap-3 border-destructive/30 min-tap"
         >
           <div className="w-11 h-11 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center">
             <LogOut className="w-5 h-5" />
           </div>
-          <div className="font-bold text-destructive">Logout</div>
+          <div className="font-bold text-destructive">{t.logout}</div>
         </motion.button>
       </div>
     </div>
