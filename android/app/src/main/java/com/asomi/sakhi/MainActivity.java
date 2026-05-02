@@ -1,4 +1,4 @@
-package com.sih.sakhiai;
+package com.asomi.sakhi;
 
 import com.getcapacitor.BridgeActivity;
 

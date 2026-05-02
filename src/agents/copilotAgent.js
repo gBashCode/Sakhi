@@ -28,14 +28,14 @@
 export function getNextAction(patient, visit, risk) {
   // ── 1. Highest priority: high risk → immediate referral ─────────────────
   if (risk?.level === 'high') {
-    return 'Turant PHC le jao. 108 call karo.';
+    return 'Turant PHC le jao. BP zyada hai.';
   }
 
   const ga = getGestationalAge(patient?.lmp_date ?? patient?.lmp ?? null);
 
-  // ── 2. IFA tablet (Iron-Folic Acid) — MoHFW: start at 12 weeks ──────────
+  // ── 2. IFA tablet (Iron-Folic Acid) ─────────────────────────────────────
   if (!visit?.ifaGiven && ga > 12) {
-    return 'Aaj IFA ki goli dena hai. Roz ek goli, khane ke baad.';
+    return 'Aaj IFA ki 1 goli dena hai.';
   }
 
   // ── 3. TT (Tetanus Toxoid) vaccine — MoHFW: TT-1 at 16 weeks ───────────

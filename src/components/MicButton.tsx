@@ -7,9 +7,10 @@ type Props = {
   onStart: () => void;
   onStop: () => void;
   size?: number;
+  disabled?: boolean;
 };
 
-export default function MicButton({ recording, onStart, onStop, size = 80 }: Props) {
+export default function MicButton({ recording, onStart, onStop, size = 80, disabled }: Props) {
   const t = useT();
 
   return (
@@ -37,14 +38,15 @@ export default function MicButton({ recording, onStart, onStop, size = 80 }: Pro
         )}
 
         <motion.button
-          whileTap={{ scale: 0.93 }}
-          onPointerDown={onStart}
-          onPointerUp={onStop}
-          onPointerLeave={recording ? onStop : undefined}
-          className={`relative rounded-full bg-gradient-mic flex items-center justify-center min-tap ${
+          whileTap={disabled ? {} : { scale: 0.93 }}
+          onPointerDown={disabled ? undefined : onStart}
+          onPointerUp={disabled ? undefined : onStop}
+          onClick={disabled ? undefined : (recording ? onStop : onStart)}
+          disabled={disabled}
+          className={`relative rounded-full bg-gradient-mic flex flex-col items-center justify-center min-tap ${
             recording ? "animate-mic-pulse" : ""
-          }`}
-          style={{ width: size, height: size, boxShadow: "var(--shadow-mic)" }}
+          } ${disabled ? "opacity-50 cursor-not-allowed grayscale" : ""}`}
+          style={{ width: size, height: size, boxShadow: disabled ? "none" : "var(--shadow-mic)" }}
           aria-label="Microphone"
         >
           <Mic
@@ -52,11 +54,21 @@ export default function MicButton({ recording, onStart, onStop, size = 80 }: Pro
             style={{ width: size * 0.4, height: size * 0.4 }}
             strokeWidth={2.2}
           />
+          {recording && !disabled && (
+            <span className="text-[10px] text-primary-foreground font-bold mt-1 uppercase tracking-tighter">
+              Tap to End
+            </span>
+          )}
+          {disabled && (
+            <span className="text-[10px] text-primary-foreground font-bold mt-1 uppercase tracking-tighter">
+              Wait...
+            </span>
+          )}
         </motion.button>
       </div>
 
       <span className="text-primary font-bold text-base tracking-wide">
-        {recording ? t.listening : t.bolo}
+        {disabled ? 'AI Loading...' : recording ? 'Stop' : 'Speak'}
       </span>
     </div>
   );

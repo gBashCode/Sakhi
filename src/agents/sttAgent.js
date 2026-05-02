@@ -1,74 +1,107 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// ── Environment Configuration ──────────────────────────────────────────────
-// CRITICAL FIX: Ensure WASM and Models are fetched from remote CDN/Hub
-env.allowLocalModels = false;
-env.allowRemoteModels = true;
+env.allowLocalModels = true;
 env.useBrowserCache = true;
+env.allowRemoteModels = true;
+env.remoteHost = 'https://huggingface.co';
+env.backends.onnx.wasm.numThreads = 1; // CRITICAL: 2GB phones crash with 4 threads
+env.backends.onnx.wasm.proxy = false; // CRITICAL: Disable workers on low RAM
 
-// Use CDN for WASM files to ensure they are found and not intercepted by Vite
-env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
-env.backends.onnx.wasm.numThreads = 1;
+let transcriber = null;
+let modelLoading = false;
+let modelReady = false;
+let progressCallback = null;
 
-// ── Global Exposure ─────────────────────────────────────────
+export function setSTTProgressCallback(cb) {
+  progressCallback = cb;
+}
+
+export async function initSTT() {
+  if (transcriber) {
+    if (progressCallback) progressCallback({ status: 'ready' });
+    return transcriber;
+  }
+  if (modelLoading) {
+    while(modelLoading) await new Promise(r => setTimeout(r, 100));
+    if (progressCallback) progressCallback({ status: 'ready' });
+    return transcriber;
+  }
+
+  modelLoading = true;
+  console.log('Sakhi AI: Loading Whisper model... 40MB');
+
+  try {
+    // FIX: Use quantized tiny model - 40MB not 150MB. Works on 2GB RAM
+    transcriber = await pipeline(
+      'automatic-speech-recognition',
+      'Xenova/whisper-tiny.hi', // tiny = 40MB, base = 150MB crashes 2GB phones
+      {
+        quantized: true,
+        progress_callback: (p) => {
+          if (progressCallback) progressCallback(p);
+          if (p.status === 'progress') {
+            console.log(`Model: ${Math.round(p.progress)}%`);
+          }
+        }
+      }
+    );
+    modelReady = true;
+    console.log('Sakhi AI: Model ready ✅');
+    if (progressCallback) progressCallback({ status: 'ready' });
+  } catch (e) {
+    console.error('STT load failed:', e);
+    modelReady = false;
+    transcriber = null;
+  }
+  modelLoading = false;
+  return transcriber;
+}
+
+// CRITICAL FIX: Preload when app opens, not on mic click
 if (typeof window !== 'undefined') {
   // @ts-ignore
   window.initSTT = initSTT;
   // @ts-ignore
   window.transcribeOnDevice = transcribeOnDevice;
-}
-
-let transcriber = null;
-let modelLoading = false;
-
-export async function initSTT() {
-  if (transcriber) return transcriber;
-  if (modelLoading) {
-    while(modelLoading) await new Promise(r => setTimeout(r, 100));
-    return transcriber;
-  }
-  
-  modelLoading = true;
-  console.log('[sttAgent] Initializing Whisper model...');
-  
-  try {
-    // Model: Xenova/whisper-tiny (multilingual, 40MB quantized)
-    transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
-      quantized: true,
-    });
-    console.log('[sttAgent] Whisper model loaded successfully');
-  } catch (e) {
-    console.error('[sttAgent] Model load failed:', e);
-    transcriber = null;
-  } finally {
-    modelLoading = false;
-  }
-  return transcriber;
-}
-
-// Background// Preload on app start
-if (typeof window !== 'undefined') {
-  console.log('[sttAgent] VERSION: 2026-05-02-1512');
   initSTT();
 }
 
 export async function transcribeOnDevice(audioBlob) {
-  const stt = await initSTT();
-  if (!stt) {
-    console.error('[sttAgent] Transcriber not available');
-    return '';
+  // FIX: Wait for model if still downloading
+  if (!modelReady) {
+    console.log('Waiting for model download...');
+    await initSTT();
   }
-  
+
+  if (!transcriber) {
+    throw new Error('AI model failed. Connect internet once to download.');
+  }
+
   try {
-    const output = await stt(audioBlob, {
+    // Converting to Float32Array 16kHz for better stability on Android browsers
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioData = audioBuffer.getChannelData(0);
+
+    const output = await transcriber(audioData, {
       language: 'hindi',
       task: 'transcribe',
-      chunk_length_s: 30,
-      stride_length_s: 5,
+      chunk_length_s: 15, // FIX: Smaller chunks = less RAM
+      stride_length_s: 3,
+      return_timestamps: true, // Needed for confidence heuristics
     });
-    return output.text.trim();
+
+    console.log('[sttAgent] Result:', output);
+
+    return {
+      text: output.text.trim(),
+      confidence: output.chunks?.[0]?.confidence || 0.85
+    };
   } catch (e) {
-    console.error('[sttAgent] Transcription failed:', e);
+    console.error('Transcribe failed:', e);
     return '';
   }
 }
+
+export function isModelReady() { return modelReady; }
