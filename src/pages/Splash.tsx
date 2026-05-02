@@ -29,8 +29,8 @@ export default function Splash() {
         animate={{ scale: 1, opacity: 1 }}
         className="relative z-10 flex flex-col items-center"
       >
-        <div className="w-28 h-28 rounded-3xl bg-gradient-primary shadow-mic flex items-center justify-center">
-          <Heart className="w-14 h-14 text-primary-foreground" fill="currentColor" />
+        <div className="w-32 h-32 flex items-center justify-center bg-white rounded-full shadow-xl border border-slate-100 p-2">
+          <img src="/logo.png" alt="Sakhi Logo" className="w-full h-full object-contain drop-shadow-md" />
         </div>
         <h1 className="mt-8 text-5xl font-display text-primary">SevaSaathi</h1>
         <p className="text-accent font-semibold tracking-widest text-sm mt-1 uppercase">AI Healthcare</p>
