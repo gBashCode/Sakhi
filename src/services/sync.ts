@@ -1,8 +1,11 @@
 /**
- * sync.ts — Real backend sync service for src/
- * Reads unsynced visits from Dexie, POSTs to FastAPI, marks synced.
+ * sync.ts — Real backend sync service
+ * Reads unsynced visits from Dexie, masks PII, POSTs to FastAPI, marks synced.
+ * Server DB never sees real patient names, phone numbers, or raw IDs.
  */
 import { db } from '@/lib/db';
+// @ts-ignore
+import { maskPII } from '@/agents/piiAgent';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -24,16 +27,24 @@ export async function syncToServer(): Promise<SyncResult> {
   if (!unsynced.length) return { saved: 0, message: 'Nothing to sync' };
 
   const payload = {
-    visits: unsynced.map((v) => ({
-      client_id: v.clientId,
-      patient_id: v.patientId,
-      bp_sys: v.bpSys ?? null,
-      bp_dia: (v as any).bpDia ?? null,
-      weight: (v as any).weight ?? null,
-      symptoms: (v as any).symptoms ?? '',
-      risk_level: v.riskLevel ?? 'low',
-      device_ts: new Date(v.deviceTs).toISOString(),
-    })),
+    visits: unsynced.map((v) => {
+      // ── Apply PII mask BEFORE building the wire payload ────────────────
+      // maskPII() removes names/phones, pseudonymises IDs, redacts LMP day.
+      // The original Dexie record (v) is never mutated.
+      const safe = maskPII(v);
+      return {
+        client_id:  safe.clientId  ?? safe.client_id,
+        patient_id: safe.patientId ?? safe.patient_id,  // pseudonymised
+        bp_sys:     safe.bpSys     ?? null,
+        bp_dia:     (safe as any).bpDia   ?? null,
+        weight:     (safe as any).weight  ?? null,
+        symptoms:   (safe as any).symptoms ?? '',
+        risk_level: safe.riskLevel ?? 'low',
+        device_ts:  new Date(v.deviceTs).toISOString(), // original ts OK
+        lmp_date:   (safe as any).lmp_date ?? null,     // YYYY-MM only
+        age_band:   (safe as any).age      ?? null,     // "20-24" band
+      };
+    }),
   };
 
   const res = await fetch(`${BASE_URL}/api/v1/sync`, {
