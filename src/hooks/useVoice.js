@@ -1,34 +1,23 @@
-import { useState, useCallback, useRef } from 'react';
-import { pipeline, env } from '@xenova/transformers';
-
-// Allow Xenova to cache models in browser
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-
-// Singleton transcriber — only loaded once across all hook instances
-let _transcriber = null;
-
-async function getTranscriber() {
-  if (!_transcriber) {
-    _transcriber = await pipeline(
-      'automatic-speech-recognition',
-      'Xenova/whisper-tiny',
-    );
-  }
-  return _transcriber;
-}
-
 /**
- * useVoice — unified hook for recording + Whisper transcription.
+ * useVoice.js — React hook for mic recording + on-device Whisper transcription.
+ *
+ * Delegates all model management to sttAgent.js (singleton, browser-cached).
+ * Works fully offline after the 40MB model is cached on first use.
  *
  * Returns:
- *   recording   — boolean, true while mic is active
+ *   recording    — boolean, true while mic is active
  *   transcribing — boolean, true while Whisper is running
- *   transcript  — string, latest transcription result
- *   start()     — begin recording
- *   stop()      — stop recording and kick off transcription
- *   reset()     — clear transcript
+ *   transcript   — string, latest transcription (e.g. "BP 150 by 90 vajan 54 kilo")
+ *   start()      — begin recording
+ *   stop()       — stop recording and kick off transcription
+ *   reset()      — clear transcript
  */
+import { useState, useCallback, useRef } from 'react';
+import { transcribeOnDevice, warmUpSTT } from '@/agents/sttAgent';
+
+// Warm up the model as soon as this module is imported (background fetch)
+warmUpSTT();
+
 export function useVoice() {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
@@ -47,17 +36,16 @@ export function useVoice() {
       };
 
       mr.onstop = async () => {
-        // Stop all mic tracks
+        // Release mic immediately
         stream.getTracks().forEach((t) => t.stop());
 
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
         setTranscribing(true);
         try {
-          const t = await getTranscriber();
-          const url = URL.createObjectURL(blob);
-          const output = await t(url, { language: 'hindi', task: 'transcribe' });
-          URL.revokeObjectURL(url);
-          setTranscript(output.text?.trim() ?? '');
+          // ── On-device Whisper via sttAgent ──────────────────────────────
+          // Works in airplane mode after first-load cache (IndexedDB / Cache API)
+          const text = await transcribeOnDevice(blob);
+          setTranscript(text);
         } catch (err) {
           console.error('[useVoice] Transcription failed:', err);
           setTranscript('');
@@ -75,7 +63,9 @@ export function useVoice() {
   }, []);
 
   const stop = useCallback(() => {
-    mrRef.current?.stop();
+    if (mrRef.current && mrRef.current.state !== 'inactive') {
+      mrRef.current.stop();
+    }
     setRecording(false);
   }, []);
 

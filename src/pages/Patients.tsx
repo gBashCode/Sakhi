@@ -109,9 +109,8 @@ export default function Patients() {
           <button
             key={f.key}
             onClick={() => setTab(f.key)}
-            className={`filter-tab whitespace-nowrap ${
-              tab === f.key ? "filter-tab-active" : "filter-tab-inactive"
-            }`}
+            className={`filter-tab whitespace-nowrap ${tab === f.key ? "filter-tab-active" : "filter-tab-inactive"
+              }`}
           >
             {f.label}
           </button>

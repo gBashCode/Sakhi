@@ -44,23 +44,48 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         // Cache all JS/CSS/HTML for full offline shell
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-        // Runtime caching: Whisper model files from CDN
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,wasm}"],
+        // ── Runtime caching: Whisper model files (40MB, first load only) ──
+        // After first fetch these are served from Cache API → works in airplane mode
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "whisper-model-cache",
-              expiration: { maxAgeSeconds: 60 * 60 * 24 * 30 }, // 30 days
-            },
-          },
-          {
+            // Xenova model shards: .onnx, .bin, tokenizer.json, config.json
             urlPattern: /^https:\/\/huggingface\.co\/.*/i,
             handler: "CacheFirst",
             options: {
               cacheName: "hf-model-cache",
-              expiration: { maxAgeSeconds: 60 * 60 * 24 * 30 },
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] }, // include opaque responses
+            },
+          },
+          {
+            // LFS (Large File Storage) shards — the actual ONNX weights
+            urlPattern: /^https:\/\/cdn-lfs\.huggingface\.co\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "hf-lfs-cache",
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // jsDelivr mirror (fallback CDN used by some Xenova builds)
+            urlPattern: /^https:\/\/cdn\.jsdelivr\.net\/.*/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "jsdelivr-cache",
+              expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // ONNX Runtime WASM worker threads
+            urlPattern: /ort-wasm.*\.wasm$/i,
+            handler: "CacheFirst",
+            options: {
+              cacheName: "onnx-wasm-cache",
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
             },
           },
         ],
