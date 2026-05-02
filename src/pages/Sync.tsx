@@ -4,6 +4,7 @@ import { CloudUpload, CheckCircle2, Clock, RefreshCw, Wifi, AlertCircle } from "
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
+import { syncToServer } from "@/services/sync";
 
 export default function Sync() {
   const t = useT();
@@ -15,22 +16,27 @@ export default function Sync() {
   const pendingVisits = visits.filter((v) => !v.synced);
   const totalPending = pendingPatients.length + pendingVisits.length;
 
-  const start = () => {
+  const start = async () => {
     setSyncing(true);
     setProgress(0);
+    // Animate progress bar while request is in-flight
     const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) { clearInterval(interval); return 100; }
-        return p + 8;
-      });
+      setProgress((p) => (p >= 90 ? 90 : p + 8));
     }, 150);
-    setTimeout(() => {
+    try {
+      const result = await syncToServer();
       clearInterval(interval);
       setProgress(100);
-      syncAll();
+      syncAll(); // update Zustand store UI state
       setSyncing(false);
-      toast.success(t.syncSuccess);
-    }, 2000);
+      const n = result.saved;
+      toast.success(n > 0 ? `Synced ${n} record${n !== 1 ? "s" : ""}` : t.syncSuccess);
+    } catch (err: any) {
+      clearInterval(interval);
+      setProgress(0);
+      setSyncing(false);
+      toast.error(`Sync failed: ${err?.message ?? "unknown error"}`);
+    }
   };
 
   const handleRetry = () => {

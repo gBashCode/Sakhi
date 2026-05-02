@@ -18,8 +18,8 @@ export default function OfflineBanner() {
     };
   }, []);
 
-  // For demo/prototype: always show offline banner
-  const showBanner = !online || true;
+  // Show banner only when truly offline
+  const showBanner = !online;
 
   if (!showBanner) return null;
 

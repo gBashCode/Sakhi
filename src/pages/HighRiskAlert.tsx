@@ -19,7 +19,7 @@ export default function HighRiskAlert() {
   };
 
   return (
-    <div className="min-h-screen urgent-bg flex flex-col items-center justify-center px-8 text-center relative overflow-hidden">
+    <div data-testid="high-risk-alert" className="min-h-screen urgent-bg flex flex-col items-center justify-center px-8 text-center relative overflow-hidden">
       {/* Animated danger rings */}
       <motion.div
         className="absolute w-80 h-80 rounded-full border-2 border-red-500/20"

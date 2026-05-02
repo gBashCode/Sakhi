@@ -1,12 +1,14 @@
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, ChevronRight } from "lucide-react";
+import { Search, Plus, ChevronRight, CloudUpload } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import RiskBadge from "@/components/RiskBadge";
 import EmptyState from "@/components/EmptyState";
 import OfflineBadge from "@/components/OfflineBadge";
+import { syncToServer } from "@/services/sync";
+import { toast } from "sonner";
 
 type Tab = "all" | "due" | "high";
 
@@ -14,8 +16,24 @@ export default function Patients() {
   const t = useT();
   const nav = useNavigate();
   const patients = useStore((s) => s.patients);
+  const syncAll = useStore((s) => s.syncAll);
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
+  const [syncing, setSyncing] = useState(false);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncToServer();
+      syncAll();
+      const n = result.saved;
+      toast.success(n > 0 ? `Synced ${n} record${n !== 1 ? "s" : ""}` : "Nothing new to sync");
+    } catch (err: any) {
+      toast.error(`Sync failed: ${err?.message ?? "unknown"}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const now = Date.now();
   const DAY = 86400000;
@@ -55,7 +73,18 @@ export default function Patients() {
           <h1 className="text-3xl font-display text-primary">{t.patients}</h1>
           <p className="text-muted-foreground text-sm">{patients.length} {t.records}</p>
         </div>
-        <OfflineBadge />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 bg-primary/10 text-primary px-3 py-2 rounded-2xl text-xs font-bold disabled:opacity-50 min-tap"
+            title="Sync Now"
+          >
+            <CloudUpload className={`w-4 h-4 ${syncing ? "animate-bounce" : ""}`} />
+            {syncing ? "Syncing…" : "Sync Now"}
+          </button>
+          <OfflineBadge />
+        </div>
       </div>
 
       {/* Search */}
