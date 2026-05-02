@@ -3,6 +3,7 @@ import { transcribeOnDevice, isModelReady } from '@/agents/sttAgent';
 import { parseMedical } from '@/agents/nerAgent';
 import { triageRisk } from '@/agents/riskAgent';
 import { getNextAction } from '@/agents/copilotAgent';
+import { speakHindi } from '@/agents/ttsAgent';
 
 export function useVoice(callbackOrPatient) {
   const [recording, setRecording] = useState(false);
@@ -55,10 +56,12 @@ export function useVoice(callbackOrPatient) {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: mimeType });
 
+        // Always run internal processing logic
+        await processAudio(blob);
+
+        // Notify parent if callback provided
         if (onComplete) {
           await onComplete(blob);
-        } else {
-          await processAudio(blob);
         }
       };
 
@@ -83,13 +86,39 @@ export function useVoice(callbackOrPatient) {
     setLoading(true);
     setError(null);
     try {
-      const text = await transcribeOnDevice(blob);
+      const sttResult = await transcribeOnDevice(blob);
+      const text = sttResult.text;
+
       if (!text) throw new Error('Could not hear. Speak louder.');
+
       const medical = parseMedical(text);
       const risk = triageRisk({...medical, age: patient?.age});
       const action = getNextAction(patient, medical, risk);
-      setResult({text, medical, risk, action});
+
+      // FAKE STREAMING FOR DEMO
+      const words = text.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        await new Promise(r => setTimeout(r, 100)); // 100ms per word
+        setResult(prev => ({
+          ...prev,
+          text: words.slice(0, i + 1).join(' '),
+          medical,
+          risk,
+          action,
+          confidence: sttResult.confidence
+        }));
+      }
+
+      // AI SPEAKS BACK
+      if (risk.level === 'high') {
+        speakHindi(`Khatra hai. ${action}`);
+      } else {
+        speakHindi(`${medical.patient_name || 'Behen'}, ${action}`);
+      }
+
     } catch (e) {
+      console.error("[useVoice] Processing failed:", e);
+      speakHindi("Mujhe samajh nahi aaya. Dobara boliye.");
       setError(e.message);
     }
     setLoading(false);

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Users, AlertTriangle, Activity, MapPin, LogOut, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { GoogleMap, useJsApiLoader, Circle, InfoWindow } from '@react-google-maps/api';
+
+// Removed Google Maps import to fix build error
+// import { GoogleMap, useJsApiLoader, Circle, InfoWindow } from '@react-google-maps/api';
 
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
 
@@ -54,21 +56,10 @@ const mapOptions = {
 export default function AdminDashboard() {
   const navigate = useNavigate();
   
-  const { isLoaded } = useJsApiLoader({
-    id: 'google-map-script',
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY
-  });
+  // Map component disabled for demo to ensure stable build
+  const isLoaded = false;
   
-  const [map, setMap] = useState<google.maps.Map | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<typeof mockHeatmapData[0] | null>(null);
-
-  const onLoad = useCallback(function callback(map: google.maps.Map) {
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(function callback(map: google.maps.Map) {
-    setMap(null);
-  }, []);
 
   return (
     <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col font-body">

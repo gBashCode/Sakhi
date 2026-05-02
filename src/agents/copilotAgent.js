@@ -14,48 +14,75 @@
  */
 
 /**
- * getNextAction(patient, visit, risk)
+ * getNextAction(patient, visit, risk, lang = 'hi')
  *
  * @param {object} patient   — from Zustand store / DB
- *   { lmp_date: string|null, name: string, ... }
  * @param {object} visit     — latest visit record
- *   { ifaGiven: boolean, ttDone: boolean, deviceTs: number|string, ... }
  * @param {object} risk      — from riskAgent.triageRisk()
- *   { level: 'high'|'medium'|'low', reasons: string[], protocol: string }
+ * @param {string} lang      — selected language ('hi', 'en', 'kn')
  *
- * @returns {string} — single Hindi action string
+ * @returns {string} — single action string in selected language
  */
-export function getNextAction(patient, visit, risk) {
+export function getNextAction(patient, visit, risk, lang = 'hi') {
+  const instructions = {
+    hi: {
+      high: 'Turant PHC le jao. BP zyada hai.',
+      ifa: 'Aaj IFA ki 1 goli dena hai.',
+      tt: 'TT ka tika lagwana hai. Najdiki PHC ya sub-centre jao.',
+      overdue: 'ANC visit due hai. Ghar jao aur patient se milo.',
+      medium: '3 din mein dobara milna hai. BP check karte rehna.',
+      normal: 'Sab normal hai. Agle mahine milna. Achha kaam kar rahi ho!'
+    },
+    en: {
+      high: 'Refer to PHC immediately. High BP detected.',
+      ifa: 'Provide 1 IFA tablet today.',
+      tt: 'TT vaccination due. Go to nearest PHC or sub-centre.',
+      overdue: 'ANC visit is overdue. Visit patient at home.',
+      medium: 'Follow up in 3 days. Monitor BP closely.',
+      normal: 'All parameters normal. Follow up next month. Good job!'
+    },
+    kn: {
+      high: 'ತಕ್ಷಣ PHC ಗೆ ಕರೆದುಕೊಂಡು ಹೋಗಿ. BP ಹೆಚ್ಚಾಗಿದೆ.',
+      ifa: 'ಇಂದು ಒಂದು IFA ಮಾತ್ರೆ ನೀಡಬೇಕು.',
+      tt: 'TT ಲಸಿಕೆ ಹಾಕಿಸಬೇಕು. ಹತ್ತಿರದ PHC ಅಥವಾ ಉಪ ಕೇಂದ್ರಕ್ಕೆ ಹೋಗಿ.',
+      overdue: 'ANC ಭೇಟಿ ಬಾಕಿ ಇದೆ. ರೋಗಿಯ ಮನೆಗೆ ಭೇಟಿ ನೀಡಿ.',
+      medium: '3 ದಿನಗಳಲ್ಲಿ ಮತ್ತೆ ಭೇಟಿ ಮಾಡಿ. BP ಪರೀಕ್ಷಿಸುತ್ತಿರಿ.',
+      normal: 'ಎಲ್ಲವೂ ಸಾಮಾನ್ಯವಾಗಿದೆ. ಮುಂದಿನ ತಿಂಗಳು ಭೇಟಿ ಮಾಡಿ. ಒಳ್ಳೆಯ ಕೆಲಸ!'
+    }
+  };
+
+  const t = instructions[lang] || instructions.hi;
+
   // ── 1. Highest priority: high risk → immediate referral ─────────────────
   if (risk?.level === 'high') {
-    return 'Turant PHC le jao. BP zyada hai.';
+    return t.high;
   }
 
   const ga = getGestationalAge(patient?.lmp_date ?? patient?.lmp ?? null);
 
   // ── 2. IFA tablet (Iron-Folic Acid) ─────────────────────────────────────
   if (!visit?.ifaGiven && ga > 12) {
-    return 'Aaj IFA ki 1 goli dena hai.';
+    return t.ifa;
   }
 
   // ── 3. TT (Tetanus Toxoid) vaccine — MoHFW: TT-1 at 16 weeks ───────────
   if (!visit?.ttDone && ga > 16) {
-    return 'TT ka tika lagwana hai. Najdiki PHC ya sub-centre jao.';
+    return t.tt;
   }
 
   // ── 4. Overdue ANC visit (> 30 days since last visit) ───────────────────
   const daysSinceLast = daysSince(visit?.deviceTs ?? visit?.createdAt ?? null);
   if (daysSinceLast !== null && daysSinceLast > 30) {
-    return 'ANC visit due hai. Ghar jao aur patient se milo.';
+    return t.overdue;
   }
 
   // ── 5. Medium risk — monitor, no immediate action ───────────────────────
   if (risk?.level === 'medium') {
-    return '3 din mein dobara milna hai. BP check karte rehna.';
+    return t.medium;
   }
 
   // ── 6. All normal ────────────────────────────────────────────────────────
-  return 'Sab normal hai. Agle mahine milna. Achha kaam kar rahi ho!';
+  return t.normal;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
