@@ -1,0 +1,31 @@
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
+from datetime import datetime
+import redis
+from app.db.session import get_db
+from app.api.deps import get_current_user
+from app.models.user import User
+from app.models.visit import Visit
+from app.schemas.sync import SyncRequest, SyncResponse
+from app.core.config import settings
+
+router = APIRouter()
+r = redis.from_url(settings.REDIS_URL)
+
+@router.post("/sync", response_model=SyncResponse)
+def sync_visits(data: SyncRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    saved = 0; failed = []
+    for v in data.visits:
+        try:
+            exists = db.query(Visit).filter(Visit.client_id == v.client_id).first()
+            if exists: continue
+            db_visit = Visit(**v.model_dump(), asha_id=current_user.id)
+            db.add(db_visit)
+            db.commit()
+            saved += 1
+            if v.risk_level == 'high':
+                r.lpush(f"alerts:phc:{current_user.village_id}", f"High risk: {v.client_id}")
+        except Exception as e:
+            failed.append({"client_id": str(v.client_id), "error": str(e)})
+    return {"saved": saved, "failed": failed, "server_ts": datetime.utcnow()}
