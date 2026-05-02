@@ -9,7 +9,7 @@ import { db } from "@/lib/db";
 import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
 import { getNextAction } from "@/agents/copilotAgent";
-import { transcribeOnDevice } from "@/agents/sttAgent";
+import { transcribeOnDevice, initSTT, isModelReady } from "@/agents/sttAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
@@ -50,9 +50,17 @@ export default function VisitForm() {
   } | null>(null);
 
   const [transcript, setTranscript] = useState("");
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [lang, setLang] = useState('hi-IN'); // 'hi-IN' or 'kn-IN'
+
+  useEffect(() => {
+    if (!isModelReady()) {
+      initSTT((percent: number) => setDownloadProgress(percent));
+    }
+  }, []);
 
   // ── useVoice hook (STT -> NER -> Risk -> Copilot) ─────────────────────────
-  const { recording, start, stop, result, loading: aiLoading, error: aiError } = useVoice(patient);
+  const { recording, start, stop, result, loading: aiLoading, error: aiError } = useVoice(patient, lang);
 
   useEffect(() => {
     if (result?.medical) {
@@ -143,8 +151,28 @@ export default function VisitForm() {
       <h1 className="text-3xl font-display text-primary">{t.visitForm}</h1>
       {patient && <p className="text-muted-foreground text-sm mt-1">{patient.name} • {patient.age} yrs</p>}
 
+      {downloadProgress > 0 && downloadProgress < 100 && (
+        <div className="mt-4 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded-2xl text-xs font-bold animate-pulse">
+          AI Download: {downloadProgress}% - Keep internet ON
+        </div>
+      )}
+
       {/* ── Mic Button ─────────────────────────────────────────────────── */}
       <div className="mt-6 flex flex-col items-center gap-2">
+        {/* Language Toggle */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => setLang('hi-IN')}
+            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${lang === 'hi-IN' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+            हिंदी
+          </button>
+          <button
+            onClick={() => setLang('kn-IN')}
+            className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${lang === 'kn-IN' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+            ಕನ್ನಡ
+          </button>
+        </div>
+
         {/* data-action required for QA regression tests */}
         <div data-action="mic-record">
           <MicButton

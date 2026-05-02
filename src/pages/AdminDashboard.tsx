@@ -10,8 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from 'react-leaflet';
-import "leaflet/dist/leaflet.css";
 
 // --- Mock Data ---
 const mockChartData = [
@@ -294,43 +292,10 @@ export default function AdminDashboard() {
 
           {/* GEO MAP LEAFLET */}
           <TabsContent value="geo" className="space-y-6 h-[700px]">
-            <div className="glass-card p-6 shadow-xl h-full flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-slate-800 font-display flex items-center gap-2">
-                  <MapPin className="h-6 w-6 text-primary" /> District Geo-Surveillance
-                </h3>
-                <div className="flex gap-4 text-sm font-semibold">
-                  <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-pink-500"></span> Maternal High-Risk</div>
-                  <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-orange-500"></span> Disease Clusters</div>
-                  <div className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500"></span> NCD Screening</div>
-                </div>
-              </div>
-              <div className="flex-1 w-full rounded-2xl overflow-hidden border border-slate-200 relative z-0">
-                <MapContainer center={[12.95, 77.6]} zoom={11} style={{ height: "100%", width: "100%" }}>
-                  <TileLayer
-                    url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  />
-                  {mockHeatmapData.map((pt) => {
-                    const color = pt.type === 'maternal' ? '#ec4899' : pt.type === 'disease' ? '#f97316' : '#3b82f6';
-                    return (
-                      <CircleMarker
-                        key={pt.id}
-                        center={[pt.lat, pt.lng]}
-                        radius={Math.min(Math.max(pt.count * 1.5, 10), 40)}
-                        pathOptions={{ fillColor: color, color: color, fillOpacity: 0.6, weight: 2 }}
-                      >
-                        <LeafletTooltip>
-                          <div className="font-body text-slate-800 text-sm p-1">
-                            <strong>{pt.village}</strong><br/>
-                            {pt.count} {pt.type} alerts
-                          </div>
-                        </LeafletTooltip>
-                      </CircleMarker>
-                    );
-                  })}
-                </MapContainer>
-              </div>
+            <div className="glass-card p-6 shadow-xl h-full flex flex-col items-center justify-center">
+               <MapPin className="h-12 w-12 text-slate-300 mb-4" />
+               <p className="text-slate-500 font-bold text-lg">Geographic View is being optimized</p>
+               <p className="text-slate-400 text-sm">Please check back after the next update.</p>
             </div>
           </TabsContent>
 

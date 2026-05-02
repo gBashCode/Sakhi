@@ -1,11 +1,16 @@
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mic, Bell, AlertTriangle, CloudUpload, Users, Syringe, ShieldAlert, CalendarClock } from "lucide-react";
+import {
+  Mic, Bell, AlertTriangle, CloudUpload, Users, Syringe,
+  ShieldAlert, CalendarClock, Download, CheckCircle2
+} from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import OfflineBadge from "@/components/OfflineBadge";
 import ActionCard from "@/components/ActionCard";
 import SOSButton from "@/components/SOSButton";
+import { isModelReady, initSTT } from "@/agents/sttAgent";
 
 export default function Home() {
   const nav = useNavigate();
@@ -13,6 +18,18 @@ export default function Home() {
   const patients = useStore((s) => s.patients);
   const userName = useStore((s) => s.userName);
   const markReferred = useStore((s) => s.markReferred);
+
+  const [downloading, setDownloading] = useState(!isModelReady());
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (!isModelReady()) {
+      initSTT((percent: number) => {
+        setProgress(percent);
+        if (percent === 100) setDownloading(false);
+      });
+    }
+  }, []);
   const pending = patients.filter((p) => !p.synced).length;
   const highRisk = patients.filter((p) => p.risk === "high").length;
   const highRiskPatient = patients.find((p) => p.risk === "high" && !p.referred);
@@ -37,6 +54,33 @@ export default function Home() {
         </div>
         <OfflineBadge />
       </div>
+
+      {/* AI READY BANNER */}
+      {downloading && (
+        <div className="mt-4 flex items-center gap-3 p-4 rounded-2xl border bg-amber-50 border-amber-200">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-amber-400">
+            <Download className="w-5 h-5 text-white animate-bounce" />
+          </div>
+          <div className="flex-1">
+            <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">AI Brain Status</div>
+            <div className="text-sm font-bold text-slate-800">
+              Installing Offline Intelligence: {progress}%
+            </div>
+          </div>
+          <div className="text-[10px] bg-amber-200 text-amber-800 px-2 py-1 rounded-full animate-pulse font-bold">Wait 1m</div>
+        </div>
+      )}
+      {!downloading && !isModelReady() && (
+         <div className="mt-4 flex items-center gap-3 p-4 rounded-2xl border bg-emerald-50 border-emerald-200">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-400">
+              <CheckCircle2 className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="text-[10px] font-bold uppercase tracking-wider opacity-60">AI Brain Status</div>
+              <div className="text-sm font-bold text-slate-800">Offline Intelligence Installed ✅</div>
+            </div>
+         </div>
+      )}
 
       {/* SOS Button */}
       <div className="mt-5">

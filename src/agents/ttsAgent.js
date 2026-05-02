@@ -1,53 +1,57 @@
-/**
- * ttsAgent.js — Simple Text-to-Speech for ASHA workers using built-in Web Speech API
- */
+let hindiVoice = null;
+let kannadaVoice = null;
 
-export async function speakHindi(text, lang = 'hi') {
-  return new Promise((resolve) => {
-    if (!window.speechSynthesis) {
-      console.warn('TTS not supported');
-      return resolve();
-    }
+// Load voices when app starts
+function loadVoices() {
+  const voices = window.speechSynthesis.getVoices();
 
-    // Cancel any ongoing speech
-    window.speechSynthesis.cancel();
+  // FIX: Find best Hindi voice
+  hindiVoice = voices.find(v => v.lang === 'hi-IN') ||
+               voices.find(v => v.name.includes('Hindi')) ||
+               voices.find(v => v.name.includes('Google हिन्दी'));
 
-    const utterance = new SpeechSynthesisUtterance(text);
+  // FIX: Find Kannada voice
+  kannadaVoice = voices.find(v => v.lang === 'kn-IN') ||
+                 voices.find(v => v.name.includes('Kannada'));
 
-    // Attempt to find a Hindi/Local voice
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find(v => v.lang === 'hi-IN' || v.name.includes('Hindi'))
-               || voices.find(v => v.lang.startsWith(lang))
-               || voices.find(v => v.lang.startsWith('hi'));
-
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    utterance.lang = lang === 'hi' ? 'hi-IN' : (lang === 'kn' ? 'kn-IN' : 'en-IN');
-    utterance.rate = 0.9; // Slightly slower for clarity for ASHA workers
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-
-    utterance.onend = () => {
-      resolve();
-    };
-
-    utterance.onerror = (e) => {
-      console.error('TTS Error:', e);
-      resolve();
-    };
-
-    window.speechSynthesis.speak(utterance);
-
-    // Fallback for some browsers where onend doesn't fire reliably
-    setTimeout(resolve, text.length * 100 + 1000);
-  });
+  console.log('Hindi voice:', hindiVoice?.name);
+  console.log('Kannada voice:', kannadaVoice?.name);
 }
 
-// Preload voices - Android Chrome needs this
-if (typeof window !== 'undefined' && window.speechSynthesis) {
-  window.speechSynthesis.onvoiceschanged = () => {
-    window.speechSynthesis.getVoices();
+// Android needs this
+if (typeof window !== 'undefined') {
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices(); // Load immediately
+}
+
+export function speakRegional(text, language = 'hi-IN') {
+  // Stop any current speech
+  window.speechSynthesis.cancel();
+
+  const utterance = new SpeechSynthesisUtterance(text);
+
+  // FIX: Set language and voice
+  utterance.lang = language;
+  if (language === 'hi-IN' && hindiVoice) {
+    utterance.voice = hindiVoice;
+  } else if (language === 'kn-IN' && kannadaVoice) {
+    utterance.voice = kannadaVoice;
+  }
+
+  utterance.rate = 0.85; // Slower for ASHA
+  utterance.pitch = 1;
+  utterance.volume = 1;
+
+  // FIX: Handle errors
+  utterance.onerror = (e) => {
+    console.error('TTS Error:', e);
   };
+
+  window.speechSynthesis.speak(utterance);
+}
+
+// FIX: Speak with ASHA's name
+export function speakToAsha(name, message, language = 'hi-IN') {
+  const fullText = name ? `${name} behen, ${message}` : message;
+  speakRegional(fullText, language);
 }
