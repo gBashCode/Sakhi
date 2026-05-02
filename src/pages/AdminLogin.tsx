@@ -10,23 +10,15 @@ export default function AdminLogin() {
   const navigate = useNavigate();
   const setAdminLoggedIn = useStore(s => s.setAdminLoggedIn);
   const [adminId, setAdminId] = useState("");
-  const [showOtp, setShowOtp] = useState(false);
-  const [otp, setOtp] = useState("");
+  const [password, setPassword] = useState("");
 
-  const handleSendOtp = (e: React.FormEvent) => {
+  const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminId !== "8585858585") {
       toast.error("Invalid Admin ID. Try 8585858585.");
       return;
     }
-    // Simulate sending OTP
-    toast.success("OTP sent to registered mobile number!");
-    setShowOtp(true);
-  };
-
-  const handleVerifyOtp = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (otp === "8585") {
+    if (password === "8585") {
       toast.success("Verified successfully");
       setAdminLoggedIn(true);
       navigate("/admin/dashboard");
@@ -49,8 +41,8 @@ export default function AdminLogin() {
             <p className="text-slate-500 mt-2 text-sm">Secure access for state health coordinators</p>
           </div>
 
-          {!showOtp ? (
-            <form onSubmit={handleSendOtp} className="w-full space-y-5">
+          <form onSubmit={handleLogin} className="w-full space-y-5">
+            <div className="space-y-4">
               <div className="space-y-2 text-left">
                 <label className="text-sm font-medium text-slate-700">Admin ID</label>
                 <div className="relative">
@@ -64,27 +56,24 @@ export default function AdminLogin() {
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full h-12 text-base font-bold">Request OTP</Button>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp} className="w-full space-y-5">
+
               <div className="space-y-2 text-left">
-                <label className="text-sm font-medium text-slate-700">Enter OTP</label>
+                <label className="text-sm font-medium text-slate-700">Password / PIN</label>
                 <div className="relative">
                   <KeyRound className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
                   <Input 
-                    type="text" 
-                    placeholder="4-digit OTP (e.g. 1234)" 
+                    type="password" 
+                    placeholder="Enter your Password" 
                     className="pl-10 h-12 bg-white/70 tracking-widest text-lg font-bold"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
-                    maxLength={4}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full h-12 text-base font-bold">Verify & Login</Button>
-            </form>
-          )}
+            </div>
+
+            <Button type="submit" className="w-full h-12 text-base font-bold mt-2">Login Securely</Button>
+          </form>
         </div>
       </div>
     </div>
