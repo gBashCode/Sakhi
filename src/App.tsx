@@ -23,8 +23,8 @@ import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
-import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import { ProtectedRoute, AdminProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -49,9 +49,10 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin" element={<Navigate to="/login" replace />} />
+            <Route element={<AdminProtectedRoute />}>
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            </Route>
           </Route>
           
           <Route element={<MobileLayout />}>
@@ -59,19 +60,23 @@ const App = () => (
             <Route path="/language" element={<LanguageSelect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/forms" element={<FormSelection />} />
-            <Route path="/home" element={<Home />} />
-            <Route path="/voice" element={<VoiceEntry />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/patient/:id" element={<PatientProfile />} />
-            <Route path="/visit/:patientId" element={<VisitForm />} />
-            <Route path="/high-risk-alert" element={<HighRiskAlert />} />
-            <Route path="/due" element={<DueThisWeek />} />
-            <Route path="/alerts" element={<Alerts />} />
-            <Route path="/sync" element={<Sync />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/metrics" element={<Metrics />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route path="/forms" element={<FormSelection />} />
+              <Route path="/home" element={<Home />} />
+              <Route path="/voice" element={<VoiceEntry />} />
+              <Route path="/patients" element={<Patients />} />
+              <Route path="/patient/:id" element={<PatientProfile />} />
+              <Route path="/visit/:patientId" element={<VisitForm />} />
+              <Route path="/high-risk-alert" element={<HighRiskAlert />} />
+              <Route path="/due" element={<DueThisWeek />} />
+              <Route path="/alerts" element={<Alerts />} />
+              <Route path="/sync" element={<Sync />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/metrics" element={<Metrics />} />
+            </Route>
+
             <Route path="/index" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
           </Route>
