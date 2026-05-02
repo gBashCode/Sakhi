@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
+import { BrowserRouter, Route, Routes, Navigate, Outlet } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
 import Splash from "./pages/Splash";
 import LanguageSelect from "./pages/LanguageSelect";
 import Login from "./pages/Login";
@@ -20,17 +21,38 @@ import Metrics from "./pages/Metrics";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
+
+const MobileLayout = () => (
+  <div className="mx-auto max-w-md min-h-screen bg-background relative shadow-2xl overflow-hidden">
+    <OfflineBanner />
+    <Outlet />
+    <BottomNav />
+  </div>
+);
+
+const AdminLayout = () => (
+  <div className="min-h-screen bg-background w-full">
+    <Outlet />
+  </div>
+);
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner position="top-center" richColors />
       <BrowserRouter>
-        <div className="mx-auto max-w-md min-h-screen bg-background relative">
-          <OfflineBanner />
-          <Routes>
+        <Routes>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          </Route>
+          
+          <Route element={<MobileLayout />}>
             <Route path="/" element={<Splash />} />
             <Route path="/language" element={<LanguageSelect />} />
             <Route path="/login" element={<Login />} />
@@ -48,9 +70,8 @@ const App = () => (
             <Route path="/metrics" element={<Metrics />} />
             <Route path="/index" element={<Navigate to="/" replace />} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
-          <BottomNav />
-        </div>
+          </Route>
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
