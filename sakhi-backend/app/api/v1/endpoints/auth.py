@@ -37,8 +37,10 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 @router.post("/login", response_model=Token)
 def login(data: UserLogin, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone == data.phone).first()
-    if not user or not verify_pin(data.pin, user.pin_hash):
-        raise HTTPException(status_code=400, detail="Incorrect phone or pin")
+    if not user:
+        raise HTTPException(status_code=404, detail="Phone number not registered")
+    if not verify_pin(data.pin, user.pin_hash):
+        raise HTTPException(status_code=401, detail="Invalid PIN")
     token = create_access_token({"sub": str(user.id)})
     return {
         "access_token": token,
