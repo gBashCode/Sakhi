@@ -11,7 +11,7 @@ async function syncToServer() {
   const unsynced = await db.visits.where('synced').equals(0).toArray();
   for (const visit of unsynced) {
     try {
-      await fetch('https://sakhi-api.up.railway.app/api/sync', {
+      await fetch('https://sakhi-api.onrender.com/api/sync', {
         method: 'POST',
         body: JSON.stringify(visit)
       });

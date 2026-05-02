@@ -1,115 +1,133 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, AlertTriangle, Save, Pencil, User, Calendar, Activity, Baby, Volume2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Save, User, Calendar, Activity, Volume2 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore, type Patient } from "@/lib/store";
 import { toast } from "sonner";
-import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
-
-import { useVoice } from "@/hooks/useVoice";
 import { speakRegional } from "@/agents/ttsAgent";
+import { transcribeRegional, getModelStatus } from "@/agents/sttAgent";
+import { parseMedical } from "@/agents/nerAgent";
+import { triageRisk } from "@/agents/riskAgent";
+import { getNextAction } from "@/agents/copilotAgent";
 
-type Phase = "idle" | "listening" | "processing" | "result" | "speaking";
+type Phase = "idle" | "speaking" | "listening" | "processing" | "result";
 
-const QUESTIONS_MAP: any = {
+const QUESTIONS_MAP: Record<string, { field: string; text: string; label: string }[]> = {
   hi: [
-    { field: "name", text: "मरीज़ का नाम क्या है?", label: "Name" },
-    { field: "age", text: "उनकी उम्र कितनी है?", label: "Age" },
-    { field: "bp", text: "बीपी कितना है? जैसे 120 और 80", label: "Blood Pressure" },
-    { field: "weight", text: "वजन कितना किलो है?", label: "Weight" },
-    { field: "symptoms", text: "क्या कोई लक्षण हैं जैसे सूजन या सिरदर्द?", label: "Symptoms" },
+    { field: "name",     text: "मरीज़ का नाम क्या है?",                        label: "Name" },
+    { field: "age",      text: "उनकी उम्र कितनी है?",                           label: "Age" },
+    { field: "bp",       text: "बीपी कितना है? जैसे 120 और 80",                label: "Blood Pressure" },
+    { field: "weight",   text: "वजन कितना किलो है?",                            label: "Weight" },
+    { field: "symptoms", text: "क्या कोई लक्षण हैं जैसे सूजन या सिरदर्द?",   label: "Symptoms" },
   ],
   en: [
-    { field: "name", text: "What is the patient's name?", label: "Name" },
-    { field: "age", text: "How old are they?", label: "Age" },
-    { field: "bp", text: "What is the BP? e.g. 120 and 80", label: "Blood Pressure" },
-    { field: "weight", text: "What is the weight in kg?", label: "Weight" },
+    { field: "name",     text: "What is the patient's name?",          label: "Name" },
+    { field: "age",      text: "How old are they?",                    label: "Age" },
+    { field: "bp",       text: "What is the BP? e.g. 120 and 80",     label: "Blood Pressure" },
+    { field: "weight",   text: "What is the weight in kg?",            label: "Weight" },
     { field: "symptoms", text: "Any symptoms like swelling or headache?", label: "Symptoms" },
   ],
   kn: [
-    { field: "name", text: "ರೋಗಿಯ ಹೆಸರೇನು?", label: "Name" },
-    { field: "age", text: "ಅವರ ವಯಸ್ಸು ಎಷ್ಟು?", label: "Age" },
-    { field: "bp", text: "BP ಎಷ್ಟು? ಉದಾಹರಣೆಗೆ 120 ಮತ್ತು 80", label: "Blood Pressure" },
-    { field: "weight", text: "ತೂಕ ಎಷ್ಟು ಕೆಜಿ?", label: "Weight" },
-    { field: "symptoms", text: "ಊತ ಅಥವಾ ತಲೆನೋವಿನಂತಹ ಯಾವುದೇ ಲಕ್ಷಣಗಳಿವೆಯೇ?", label: "Symptoms" },
-  ]
+    { field: "name",     text: "ರೋಗಿಯ ಹೆಸರೇನು?",                                     label: "Name" },
+    { field: "age",      text: "ಅವರ ವಯಸ್ಸು ಎಷ್ಟು?",                                label: "Age" },
+    { field: "bp",       text: "BP ಎಷ್ಟು? ಉದಾಹರಣೆಗೆ 120 ಮತ್ತು 80",               label: "Blood Pressure" },
+    { field: "weight",   text: "ತೂಕ ಎಷ್ಟು ಕೆಜಿ?",                                 label: "Weight" },
+    { field: "symptoms", text: "ಊತ ಅಥವಾ ತಲೆನೋವಿನಂತಹ ಯಾವುದೇ ಲಕ್ಷಣಗಳಿವೆಯೇ?",  label: "Symptoms" },
+  ],
 };
 
 export default function VoiceEntry() {
   const t = useT();
   const nav = useNavigate();
   const lang = useStore((s) => s.lang);
+  const langCode = lang === "kn" ? "kn-IN" : lang === "en" ? "en-US" : "hi-IN";
   const addPatient = useStore((s) => s.addPatient);
 
   const QUESTIONS = QUESTIONS_MAP[lang] || QUESTIONS_MAP.hi;
 
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [qIndex, setQIndex] = useState(-1);
+  const [phase, setPhase]         = useState<Phase>("idle");
+  const [qIndex, setQIndex]       = useState(-1);
+  const [recording, setRecording] = useState(false);
+  const [transcript, setTranscript] = useState("");
   const [medicalData, setMedicalData] = useState<any>({
-    patient_name: null, age: null, bp_sys: null, bp_dia: null, weight_kg: null, symptoms: []
+    patient_name: null, age: null, bp_sys: null, bp_dia: null, weight_kg: null, symptoms: [],
   });
-
   const [finalPatient, setFinalPatient] = useState<Patient | null>(null);
+  const modelLoading = getModelStatus() === "loading";
 
-  // Auto-start next question
+  // Ref to avoid stale closures in buildResult
+  const medRef = useRef(medicalData);
+  useEffect(() => { medRef.current = medicalData; }, [medicalData]);
+
+  // Trigger question flow when qIndex changes
   useEffect(() => {
-    if (qIndex >= 0 && qIndex < QUESTIONS.length) {
-      askQuestion(qIndex);
-    } else if (qIndex === QUESTIONS.length) {
-      finishProcess();
+    if (qIndex < 0) return;
+    if (qIndex < QUESTIONS.length) {
+      runQuestion(qIndex);
+    } else {
+      buildResult();
     }
   }, [qIndex]);
 
-  const askQuestion = async (index: number) => {
-    setPhase("speaking");
+  const runQuestion = async (index: number) => {
     const q = QUESTIONS[index];
-    await speakHindi(q.text, lang);
+    setPhase("speaking");
+    setTranscript("");
+    speakRegional(q.text, langCode);
+
+    // Wait for TTS (estimate by char count)
+    const waitMs = Math.max(1500, q.text.length * 60);
+    await new Promise((r) => setTimeout(r, waitMs));
+
     setPhase("listening");
-    start(); // Start listening automatically
-  };
+    setRecording(true);
+    try {
+      const text = await transcribeRegional(langCode);
+      setRecording(false);
+      setTranscript(text || "");
+      setPhase("processing");
 
-  const handleVoiceComplete = (blob: Blob) => {
-    // This is handled by useVoice internally now,
-    // but we can add UI state transitions here if needed
-    setPhase("processing");
-  };
-
-  const { recording, start, stop, result, modelLoading, error } = useVoice(handleVoiceComplete);
-
-  // Handle result from useVoice
-  useEffect(() => {
-    if (result) {
-      const currentField = QUESTIONS[qIndex]?.field;
-      if (currentField) {
-        setMedicalData((prev: any) => ({
-          ...prev,
-          ...result.medical,
-          // Extra safety for the specific question flow
-          ...(currentField === 'bp' ? { bp_sys: result.medical.bp_sys, bp_dia: result.medical.bp_dia } : {})
-        }));
+      if (text) {
+        const parsed = parseMedical(text);
+        setMedicalData((prev: any) => ({ ...prev, ...filterByField(parsed, q.field) }));
       }
 
-      // If useVoice finished its streaming/processing for this chunk
-      if (result.action && phase === "processing") {
-        setTimeout(() => {
-          setQIndex(prev => prev + 1);
-        }, 1500);
-      }
+      await new Promise((r) => setTimeout(r, 900));
+      setQIndex((prev) => prev + 1);
+    } catch (e) {
+      setRecording(false);
+      console.error("STT error:", e);
+      setQIndex((prev) => prev + 1); // skip on error
     }
-  }, [result]);
+  };
 
-  const finishProcess = () => {
-    if (!result) return;
+  const filterByField = (parsed: any, field: string) => {
+    switch (field) {
+      case "name":     return { patient_name: parsed.patient_name };
+      case "age":      return { age: parsed.age };
+      case "bp":       return { bp_sys: parsed.bp_sys, bp_dia: parsed.bp_dia };
+      case "weight":   return { weight_kg: parsed.weight_kg };
+      case "symptoms": return { symptoms: parsed.symptoms };
+      default:         return parsed;
+    }
+  };
+
+  const buildResult = () => {
+    const md = medRef.current;
+    const risk = triageRisk({ ...md, age: md.age ? parseInt(md.age) : null });
+    const action = getNextAction({ ifaGiven: false }, { weight_kg: md.weight_kg }, risk, lang);
+
+    speakRegional(action, langCode);
 
     const newPatient: Patient = {
       id: `p_${Date.now()}`,
-      name: medicalData.patient_name || "Unknown",
-      age: medicalData.age || "25",
-      symptoms: medicalData.symptoms.join(", ") || "None",
-      risk: result.risk.level as any,
-      recommendation: result.risk.protocol + " " + result.action,
+      name: md.patient_name || "Unknown",
+      age: md.age || "N/A",
+      symptoms: (md.symptoms || []).join(", ") || "None",
+      risk: risk.level as any,
+      recommendation: action,
       createdAt: Date.now(),
       lastVisit: Date.now(),
       synced: false,
@@ -121,6 +139,9 @@ export default function VoiceEntry() {
   };
 
   const startFlow = () => {
+    setMedicalData({ patient_name: null, age: null, bp_sys: null, bp_dia: null, weight_kg: null, symptoms: [] });
+    setFinalPatient(null);
+    setTranscript("");
     setQIndex(0);
   };
 
@@ -129,9 +150,12 @@ export default function VoiceEntry() {
     addPatient(finalPatient);
     toast.success(t.saved);
     nav(finalPatient.risk === "high" ? "/high-risk-alert" : "/home", {
-      state: { patientId: finalPatient.id }
+      state: { patientId: finalPatient.id },
     });
   };
+
+  const progressLabel =
+    qIndex >= 0 && qIndex < QUESTIONS.length ? `${qIndex + 1} / ${QUESTIONS.length}` : null;
 
   return (
     <div className="min-h-screen pb-32 px-5 pt-6 pattern-organic relative">
@@ -144,7 +168,9 @@ export default function VoiceEntry() {
         <p className="text-muted-foreground text-sm mt-1">AI will ask questions one by one</p>
       </div>
 
-      <div className="mt-8 flex flex-col items-center">
+      <div className="mt-8 flex flex-col items-center gap-6">
+
+        {/* IDLE */}
         {phase === "idle" && (
           <motion.button
             whileTap={{ scale: 0.95 }}
@@ -155,10 +181,19 @@ export default function VoiceEntry() {
           </motion.button>
         )}
 
-        {(phase === "listening" || phase === "speaking" || phase === "processing") && (
+        {/* ACTIVE PHASES */}
+        {phase !== "idle" && phase !== "result" && (
           <div className="flex flex-col items-center gap-6 w-full">
+            {progressLabel && (
+              <div className="text-xs font-bold text-muted-foreground tracking-widest">
+                QUESTION {progressLabel}
+              </div>
+            )}
+
             <div className="glass-card p-6 w-full text-center border-2 border-primary/20">
-              <span className="text-xs font-bold text-primary uppercase tracking-widest">Current Question</span>
+              <span className="text-xs font-bold text-primary uppercase tracking-widest">
+                {QUESTIONS[qIndex]?.label}
+              </span>
               <h2 className="text-2xl font-bold mt-2 text-foreground">
                 {QUESTIONS[qIndex]?.text}
               </h2>
@@ -166,83 +201,87 @@ export default function VoiceEntry() {
 
             <AnimatePresence mode="wait">
               {phase === "speaking" ? (
-                <motion.div key="speaking" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
+                <motion.div key="speaking" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                  className="flex flex-col items-center gap-3">
                   <div className="w-32 h-32 rounded-full bg-accent/20 flex items-center justify-center animate-pulse">
                     <Volume2 className="w-12 h-12 text-accent" />
                   </div>
+                  <p className="text-sm text-muted-foreground">Sakhi bol rahi hai...</p>
+                </motion.div>
+              ) : phase === "listening" ? (
+                <motion.div key="listening" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                  className="flex flex-col items-center gap-3">
+                  <div className="w-32 h-32 rounded-full bg-primary/10 border-4 border-primary flex items-center justify-center animate-pulse">
+                    <span className="text-5xl">🎙️</span>
+                  </div>
+                  <p className="text-base font-bold text-primary">Boliye...</p>
+                  {modelLoading && (
+                    <p className="text-sm text-accent font-bold animate-pulse bg-accent/10 px-4 py-2 rounded-2xl">
+                      AI load ho raha hai, thoda wait karein...
+                    </p>
+                  )}
                 </motion.div>
               ) : (
-                <div className="flex flex-col items-center gap-4">
-                  <MicButton recording={recording} onStart={start} onStop={stop} size={140} disabled={modelLoading} />
-                  {modelLoading && (
-                    <div className="bg-accent/10 border border-accent/20 px-4 py-2 rounded-2xl animate-pulse">
-                      <p className="text-sm text-accent font-bold">First time: Downloading 140MB AI. Keep internet ON.</p>
-                    </div>
-                  )}
-                </div>
+                <motion.div key="processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                  className="flex flex-col items-center gap-2">
+                  <div className="flex gap-1.5">
+                    {[0, 150, 300].map((d) => (
+                      <div key={d} className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce"
+                        style={{ animationDelay: `${d}ms` }} />
+                    ))}
+                  </div>
+                  <span className="text-sm font-bold text-primary animate-pulse">Sakhi AI soch rahi hai...</span>
+                </motion.div>
               )}
             </AnimatePresence>
 
-            {result?.text && (
-              <div className="w-full max-w-sm flex flex-col gap-2">
-                <VoiceTranscript text={result.text} confidence={Math.round((result.confidence || 0) * 100)} />
-                {result.confidence < 0.6 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-1 text-xs text-yellow-600 font-bold bg-yellow-50 p-2 rounded-lg border border-yellow-200">
-                    <AlertTriangle className="w-3 h-3" /> AI not sure. Please confirm.
-                  </motion.div>
-                )}
-              </div>
-            )}
-
-            {phase === "processing" && !result?.text && (
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex gap-1.5">
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-                <span className="text-sm font-bold text-primary animate-pulse">Sakhi AI soch rahi hai...</span>
+            {transcript && (
+              <div className="w-full max-w-sm">
+                <VoiceTranscript text={transcript} />
               </div>
             )}
           </div>
         )}
-      </div>
 
-      {/* Result cards */}
-      <AnimatePresence>
-        {phase === "result" && finalPatient && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-2 pb-10">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-4 h-4 text-accent" />
-              <h3 className="font-bold text-foreground">Summary</h3>
-            </div>
-            <div className="space-y-3">
-              <Field icon={User} label="Name" value={finalPatient.name} />
-              <Field icon={Calendar} label="Age" value={`${finalPatient.age} years`} />
-              <Field icon={Activity} label="Symptoms" value={finalPatient.symptoms} />
-
-              <div className={`rounded-3xl p-5 border-2 ${
-                finalPatient.risk === "high" ? "bg-destructive/10 border-destructive/30" : "bg-emerald-50 border-emerald-200"
-              }`}>
-                <div className="flex justify-between items-center mb-1">
-                  <div className="font-bold text-xs uppercase tracking-wider">AI Recommendation</div>
-                  <button
-                    onClick={() => speakHindi(finalPatient.recommendation, lang)}
-                    className="flex items-center gap-1 text-[10px] bg-white px-2 py-1 rounded-full border shadow-sm font-bold active:scale-95"
-                  >
-                    <Volume2 className="w-3 h-3" /> Dobara Suno
-                  </button>
-                </div>
-                <p className="font-semibold text-sm">{finalPatient.recommendation}</p>
+        {/* RESULT */}
+        <AnimatePresence>
+          {phase === "result" && finalPatient && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full pb-10">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-foreground">Visit Summary</h3>
               </div>
+              <div className="space-y-3">
+                <Field icon={User}     label="Name"     value={finalPatient.name} />
+                <Field icon={Calendar} label="Age"      value={`${finalPatient.age} years`} />
+                <Field icon={Activity} label="Symptoms" value={finalPatient.symptoms || "None"} />
 
-              <button onClick={save} className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl flex items-center justify-center gap-2">
-                <Save className="w-5 h-5" /> Save Visit
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <div className={`rounded-3xl p-5 border-2 ${
+                  finalPatient.risk === "high"
+                    ? "bg-destructive/10 border-destructive/30"
+                    : "bg-emerald-50 border-emerald-200"
+                }`}>
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="font-bold text-xs uppercase tracking-wider">AI Recommendation</div>
+                    <button
+                      onClick={() => speakRegional(finalPatient.recommendation, langCode)}
+                      className="flex items-center gap-1 text-[10px] bg-white px-2 py-1 rounded-full border shadow-sm font-bold active:scale-95"
+                    >
+                      <Volume2 className="w-3 h-3" /> Dobara Suno
+                    </button>
+                  </div>
+                  <p className="font-semibold text-sm">{finalPatient.recommendation}</p>
+                </div>
+
+                <button onClick={save}
+                  className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl flex items-center justify-center gap-2">
+                  <Save className="w-5 h-5" /> Save Visit
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

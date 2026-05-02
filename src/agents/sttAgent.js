@@ -115,7 +115,7 @@ async function runFallback(language) {
           if (navigator.onLine) {
              const formData = new FormData();
              formData.append('file', audioBlob, 'audio.webm');
-             const res = await fetch('https://sakhi-api.up.railway.app/api/transcribe', {
+             const res = await fetch('https://sakhi-api.onrender.com/api/transcribe', {
                method: 'POST', body: formData
              });
              const data = await res.json();
