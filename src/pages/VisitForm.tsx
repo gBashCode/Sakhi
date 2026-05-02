@@ -112,10 +112,14 @@ export default function VisitForm() {
 
   // ── Save to Dexie (offline-first) then Zustand store ─────────────────────
   const handleSave = useCallback(async () => {
+    if (aiLoading || recording) return;
+
     const sysNum = parseInt(bpSys) || undefined;
     const diaNum = parseInt(bpDia) || undefined;
     const wtNum  = parseFloat(weight) || undefined;
     const riskLevel = calcRisk(sysNum ?? null, diaNum ?? null, symptoms);
+
+    console.log("[VisitForm] Saving visit:", { bpSys, symptoms, summary });
 
     try {
       // 1. Persist to Dexie IndexedDB (works offline)
@@ -149,7 +153,7 @@ export default function VisitForm() {
       console.error("[VisitForm] Save failed:", err);
       toast.error("Could not save visit. Please try again.");
     }
-  }, [bpSys, bpDia, weight, symptoms, patientId, updatePatient, nav, t.saved]);
+  }, [bpSys, bpDia, weight, symptoms, summary, aiLoading, recording, patientId, updatePatient, nav, t.saved]);
 
   const downloadFile = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob);
@@ -474,7 +478,7 @@ export default function VisitForm() {
         data-action="save-visit"
         whileTap={{ scale: 0.97 }}
         onClick={handleSave}
-        disabled={!bpSys && !symptoms}
+        disabled={( !bpSys && !symptoms ) || aiLoading || recording}
         className="mt-6 w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 min-tap disabled:opacity-50"
       >
         <Save className="w-5 h-5" /> {t.saveVisit}
