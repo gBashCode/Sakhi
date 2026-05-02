@@ -35,11 +35,17 @@ export default function Login() {
       }
       nav("/home");
     } catch (err: any) {
-      // Fallback for demo/offline: allow login without backend
-      console.warn("Backend unavailable, using demo mode:", err?.message);
-      setLoggedIn(true);
-      nav("/home");
-      toast.info("Demo mode — backend offline");
+      if (err.response) {
+        // Backend responded with an error (404 Not Found or 401 Unauthorized)
+        const errorMessage = err.response.data?.detail || "Login failed";
+        toast.error(errorMessage);
+        if (err.response.status === 404) {
+          toast.info("Please sign up first.");
+        }
+      } else {
+        // Network error / backend offline
+        toast.error("Unable to connect to server. Please ensure backend is running.");
+      }
     } finally {
       setLoading(false);
     }
