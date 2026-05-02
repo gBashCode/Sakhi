@@ -113,12 +113,13 @@ export default function AdminDashboard() {
               <KPI title="Disease Alerts" value="12" icon={Activity} color="orange" trend="+4" />
             </div>
             
-            <div className="glass-card p-6 h-[400px] shadow-xl">
+            <div className="glass-card p-6 h-[400px] shadow-xl flex flex-col">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-bold text-slate-800 font-display">Weekly Field Visits vs High Risk Findings</h3>
               </div>
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={mockChartData} margin={{ top: 0, right: 0, left: -20, bottom: 20 }}>
+              <div className="flex-1 min-h-0 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={mockChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorV" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/></linearGradient>
                     <linearGradient id="colorR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/><stop offset="95%" stopColor="#ef4444" stopOpacity={0}/></linearGradient>
@@ -127,11 +128,12 @@ export default function AdminDashboard() {
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                   <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                   <RechartsTooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }} />
-                  <Legend />
+                  <Legend verticalAlign="top" height={36} wrapperStyle={{ paddingBottom: '10px' }} />
                   <Area type="monotone" dataKey="visits" name="Total Visits" stroke="#3b82f6" fill="url(#colorV)" strokeWidth={3} />
                   <Area type="monotone" dataKey="highRisk" name="High Risk Identified" stroke="#ef4444" fill="url(#colorR)" strokeWidth={3} />
                 </AreaChart>
               </ResponsiveContainer>
+              </div>
             </div>
           </TabsContent>
 
