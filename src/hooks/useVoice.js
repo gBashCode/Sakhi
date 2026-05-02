@@ -1,27 +1,15 @@
-/**
- * useVoice.js — React hook for mic recording + on-device Whisper transcription.
- *
- * Delegates all model management to sttAgent.js (singleton, browser-cached).
- * Works fully offline after the 40MB model is cached on first use.
- *
- * Returns:
- *   recording    — boolean, true while mic is active
- *   transcribing — boolean, true while Whisper is running
- *   transcript   — string, latest transcription (e.g. "BP 150 by 90 vajan 54 kilo")
- *   start()      — begin recording
- *   stop()       — stop recording and kick off transcription
- *   reset()      — clear transcript
- */
 import { useState, useCallback, useRef } from 'react';
-import { transcribeOnDevice, warmUpSTT } from '@/agents/sttAgent';
+import { transcribeOnDevice } from '@/agents/sttAgent';
+import { parseMedical } from '@/agents/nerAgent';
+import { triageRisk } from '@/agents/riskAgent';
+import { getNextAction } from '@/agents/copilotAgent';
 
-// Warm up the model as soon as this module is imported (background fetch)
-warmUpSTT();
-
-export function useVoice(onStopBlob) {
+export function useVoice(patient) {
   const [recording, setRecording] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [result, setResult] = useState(null);
+  
   const mrRef = useRef(null);
   const chunksRef = useRef([]);
 
@@ -30,27 +18,22 @@ export function useVoice(onStopBlob) {
       chunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mr = new MediaRecorder(stream);
-
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-
       mr.onstop = async () => {
-        // Release mic immediately
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        if (onStopBlob) {
-           onStopBlob(blob);
-        }
+        await processAudio(blob);
       };
-
       mr.start();
       mrRef.current = mr;
       setRecording(true);
+      setError(null);
     } catch (err) {
-      console.error('[useVoice] Mic access failed:', err);
+      setError("Mic access failed");
     }
-  }, []);
+  }, [patient]);
 
   const stop = useCallback(() => {
     if (mrRef.current && mrRef.current.state !== 'inactive') {
@@ -59,9 +42,21 @@ export function useVoice(onStopBlob) {
     setRecording(false);
   }, []);
 
-  const reset = useCallback(() => {
-    setTranscript('');
-  }, []);
+  const processAudio = async (blob) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const text = await transcribeOnDevice(blob);
+      if (!text) throw new Error('Could not hear. Speak louder.');
+      const medical = parseMedical(text);
+      const risk = triageRisk({...medical, age: patient?.age});
+      const action = getNextAction(patient, medical, risk);
+      setResult({text, medical, risk, action});
+    } catch (e) {
+      setError(e.message);
+    }
+    setLoading(false);
+  };
 
-  return { recording, transcribing, transcript, start, stop, reset };
+  return { recording, start, stop, result, loading, error };
 }

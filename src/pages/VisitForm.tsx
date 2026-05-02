@@ -49,45 +49,23 @@ export default function VisitForm() {
     risk: string; score: number; confidence: string; detail: string;
   } | null>(null);
 
-  const [loading, setLoading] = useState(false);
   const [transcript, setTranscript] = useState("");
 
-  const handleVoiceComplete = async (blob: Blob) => {
-    setLoading(true);
-    try {
-      // Agent 1: Speech-to-Text
-      const text = await transcribeOnDevice(blob);
-      setTranscript(text);
-      
-      // Agent 2: NLP / NER Parser
-      const medical = parseMedical(text);
-      if (medical.bp_sys) { setBpSys(String(medical.bp_sys)); setGlowField("bp"); }
-      if (medical.bp_dia) setBpDia(String(medical.bp_dia));
-      if (medical.weight_kg) { setWeight(String(medical.weight_kg)); setGlowField("weight"); }
-      if (medical.symptoms.length) {
-         setSymptoms(medical.symptoms.join(", "));
-         setGlowField("symptoms");
-      }
+  // ── useVoice hook (STT -> NER -> Risk -> Copilot) ─────────────────────────
+  const { recording, start, stop, result, loading: aiLoading, error: aiError } = useVoice(patient);
 
-      // Agent 3: Clinical Triage
-      const age = patient?.age ? parseInt(patient.age) : null;
-      const riskCalc = triageRisk({ ...medical, age });
-      setRisk(riskCalc.level as Risk);
-      setTriage(riskCalc);
-
-      // Agent 4: CalmOps Copilot
-      const visitSnapshot = { ifaGiven: false, ttDone: false, deviceTs: Date.now() };
-      const action = getNextAction(patient ?? {}, visitSnapshot, riskCalc);
-      setSalah(action);
-    } catch (err) {
-      console.error("Pipeline failed:", err);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (result?.medical) {
+      const { bp_sys, bp_dia, weight_kg, symptoms: sympArr } = result.medical;
+      if (bp_sys) { setBpSys(String(bp_sys)); setGlowField("bp"); }
+      if (bp_dia) setBpDia(String(bp_dia));
+      if (weight_kg) { setWeight(String(weight_kg)); setGlowField("weight"); }
+      if (sympArr?.length) { setSymptoms(sympArr.join(", ")); setGlowField("symptoms"); }
     }
-  };
-
-  // ── useVoice hook (recording only now) ────────────────────────────────────
-  const { recording, start, stop } = useVoice(handleVoiceComplete);
+    if (result?.text) setTranscript(result.text);
+    if (result?.risk) { setRisk(result.risk.level as Risk); setTriage(result.risk); }
+    if (result?.action) setSalah(result.action);
+  }, [result]);
 
   // ── Risk + Triage + Copilot: recalculate on every form change ─────────────
   useEffect(() => {
@@ -175,9 +153,14 @@ export default function VisitForm() {
             onStop={stop}
           />
         </div>
-        {loading && (
+        {aiLoading && (
           <p className="text-xs text-accent font-semibold animate-pulse">
             Sakhi AI soch rahi hai...
+          </p>
+        )}
+        {aiError && (
+          <p className="text-xs text-destructive font-semibold">
+            {aiError}
           </p>
         )}
         {recording && (

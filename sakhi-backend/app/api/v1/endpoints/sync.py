@@ -25,7 +25,8 @@ def sync_visits(data: SyncRequest, db: Session = Depends(get_db), current_user: 
             db.commit()
             saved += 1
             if v.risk_level == 'high':
-                r.lpush(f"alerts:phc:{current_user.village_id}", f"High risk: {v.client_id}")
+                alert_msg = f"High Risk: {v.client_id[:8]}.. | BP: {v.bp_sys}/{v.bp_dia} | Symptoms: {', '.join(v.symptoms) if v.symptoms else 'None'}"
+                r.lpush(f"alerts:phc:{current_user.village_id}", alert_msg)
         except Exception as e:
             failed.append({"client_id": str(v.client_id), "error": str(e)})
     return {"saved": saved, "failed": failed, "server_ts": datetime.utcnow()}

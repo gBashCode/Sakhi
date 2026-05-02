@@ -8,43 +8,74 @@ import { toast } from "sonner";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 
+import { transcribeOnDevice } from "@/agents/sttAgent";
+import { parseMedical } from "@/agents/nerAgent";
+import { triageRisk } from "@/agents/riskAgent";
+import { getNextAction } from "@/agents/copilotAgent";
+import { useVoice } from "@/hooks/useVoice";
+
 type Phase = "idle" | "listening" | "processing" | "result";
 
 export default function VoiceEntry() {
   const t = useT();
   const nav = useNavigate();
   const addPatient = useStore((s) => s.addPatient);
-  const isDemo = useStore((s) => s.isDemo);
   const [phase, setPhase] = useState<Phase>("idle");
   const [patient, setPatient] = useState<Patient | null>(null);
   const [transcript, setTranscript] = useState("");
-  const [recording, setRecording] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleVoiceComplete = async (blob: Blob) => {
+    setPhase("processing");
+    setLoading(true);
+    try {
+      // 1. Speech-to-Text
+      const text = await transcribeOnDevice(blob);
+      setTranscript(text);
+
+      // 2. NER Parsing
+      const medical = parseMedical(text);
+      
+      // 3. Triage
+      const riskCalc = triageRisk(medical);
+      
+      // 4. Copilot Action
+      const action = getNextAction({}, {}, riskCalc);
+
+      const newPatient: Patient = {
+        id: `p_${Date.now()}`,
+        name: medical.name || "Unknown Patient",
+        age: medical.age || "25",
+        pregnancyMonth: medical.lmp_date ? "Unknown" : undefined, // Heuristic
+        symptoms: medical.symptoms.join(", ") || "No major symptoms",
+        risk: riskCalc.level as any,
+        recommendation: riskCalc.protocol + " " + action,
+        createdAt: Date.now(),
+        lastVisit: Date.now(),
+        synced: false,
+        dueItems: [],
+      };
+
+      setPatient(newPatient);
+      setPhase("result");
+    } catch (err) {
+      console.error("[VoiceEntry] AI Pipeline failed:", err);
+      toast.error("AI processing failed. Please try again or enter manually.");
+      setPhase("idle");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const { recording, start, stop } = useVoice(handleVoiceComplete);
 
   const startListening = () => {
-    setRecording(true);
     setPhase("listening");
+    start();
   };
 
   const stopListening = () => {
-    setRecording(false);
-    setPhase("processing");
-    const demoText = isDemo
-      ? "Lakshmi, 27 saal, 7 mahine pregnant, pair mein sujan, BP 145 by 92"
-      : "Lakshmi, 7 months pregnant, swelling in legs";
-    setTranscript(demoText);
-    setTimeout(() => {
-      const mock: Patient = {
-        id: `p_${Date.now()}`, name: "Lakshmi", age: "27",
-        pregnancyMonth: "7", pregnancyWeek: 30, village: "Mandya",
-        lmp: "2025-10-01", edd: "2026-07-08",
-        symptoms: "Swelling in legs, mild fatigue", risk: "high",
-        recommendation: "High-risk pregnancy detected. Refer to nearest PHC within 24 hours.",
-        createdAt: Date.now(), lastVisit: Date.now(), synced: false,
-        dueItems: [{ type: "followup", label: "High-risk follow-up", dueDate: Date.now() }],
-      };
-      setPatient(mock);
-      setPhase("result");
-    }, 1600);
+    stop();
   };
 
   const save = () => {
@@ -130,15 +161,30 @@ export default function VoiceEntry() {
 
               {/* AI Recommendation */}
               <motion.div variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
-                className="rounded-3xl p-5 bg-destructive/10 border-2 border-destructive/30 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-destructive/10 rounded-full blur-2xl" />
+                className={`rounded-3xl p-5 border-2 relative overflow-hidden ${
+                  patient.risk === "high" 
+                    ? "bg-destructive/10 border-destructive/30" 
+                    : patient.risk === "medium"
+                    ? "bg-accent/10 border-accent/30"
+                    : "bg-emerald-50 border-emerald-200"
+                }`}>
+                <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-2xl ${
+                  patient.risk === "high" ? "bg-destructive/10" : patient.risk === "medium" ? "bg-accent/10" : "bg-emerald-500/10"
+                }`} />
                 <div className="flex items-center gap-2 relative">
-                  <div className="w-10 h-10 rounded-2xl bg-destructive text-destructive-foreground flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5" />
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                    patient.risk === "high" ? "bg-destructive text-destructive-foreground" : 
+                    patient.risk === "medium" ? "bg-accent text-white" : "bg-emerald-500 text-white"
+                  }`}>
+                    {patient.risk === "high" ? <AlertTriangle className="w-5 h-5" /> : 
+                     patient.risk === "medium" ? <Activity className="w-5 h-5" /> : <Sparkles className="w-5 h-5" />}
                   </div>
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider font-bold text-destructive">{t.aiRec}</div>
-                    <div className="text-xs text-muted-foreground">High Risk</div>
+                    <div className={`text-[11px] uppercase tracking-wider font-bold ${
+                      patient.risk === "high" ? "text-destructive" : 
+                      patient.risk === "medium" ? "text-accent" : "text-emerald-700"
+                    }`}>{t.aiRec}</div>
+                    <div className="text-xs text-muted-foreground capitalize">{patient.risk} Risk</div>
                   </div>
                 </div>
                 <p className="mt-3 text-foreground font-semibold leading-snug relative">{patient.recommendation}</p>

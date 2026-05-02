@@ -45,3 +45,8 @@ class SakhiDB extends Dexie {
 }
 
 export const db = new SakhiDB();
+
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.db = db;
+}

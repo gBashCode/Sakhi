@@ -14,8 +14,8 @@ def get_alerts(current_user = Depends(get_current_user)):
     try:
         alerts = r.lrange(f"alerts:phc:{current_user.village_id}", 0, 20)
         return {"alerts": [a.decode() if isinstance(a, bytes) else a for a in alerts]}
-    except redis.exceptions.ConnectionError:
-        return {"alerts": ["MOCKED ALERT: High risk: 1234 (Redis Offline)"]}
+    except Exception:
+        return {"alerts": ["High risk alert system temporarily offline. Please check PHC register."]}
 
 @router.get("/patients/due")
 def get_due_patients(current_user = Depends(get_current_user), db: Session = Depends(get_db)):

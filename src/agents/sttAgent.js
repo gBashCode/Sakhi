@@ -1,87 +1,74 @@
-/**
- * sttAgent.js — On-device Speech-to-Text using Whisper (tiny.hi)
- *
- * Uses @xenova/transformers running entirely in the browser via ONNX Runtime.
- * The 40MB model is downloaded on first use and cached by the browser —
- * subsequent loads (including airplane mode) work fully offline.
- *
- * Model: Xenova/whisper-tiny — multilingual, works well for Hindi + English.
- * Target device: Redmi 9A (2GB RAM). Inference ~5–8s for a 5s clip.
- */
 import { pipeline, env } from '@xenova/transformers';
 
-// Allow browser-side caching of the ONNX model weights
+// ── Environment Configuration ──────────────────────────────────────────────
+// CRITICAL FIX: Ensure WASM and Models are fetched from remote CDN/Hub
 env.allowLocalModels = false;
+env.allowRemoteModels = true;
 env.useBrowserCache = true;
 
-// Singleton — load once, reuse across all calls
-let _model = null;
-let _loading = false;
-let _loadPromise = null;
+// Use CDN for WASM files to ensure they are found and not intercepted by Vite
+env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
+env.backends.onnx.wasm.numThreads = 1;
 
-/**
- * initSTT()
- * Loads Whisper tiny (multilingual) if not already loaded.
- * Returns the pipeline instance.
- * Safe to call concurrently — only one fetch in flight.
- */
-export async function initSTT() {
-  if (_model) return _model;
-  if (_loading) return _loadPromise;
-
-  _loading = true;
-  _loadPromise = pipeline(
-    'automatic-speech-recognition',
-    'Xenova/whisper-tiny',            // 41MB, multilingual (Hindi + English)
-  ).then((p) => {
-    _model = p;
-    _loading = false;
-    console.log('[sttAgent] Whisper tiny loaded and cached');
-    return _model;
-  }).catch((err) => {
-    _loading = false;
-    _loadPromise = null;
-    throw err;
-  });
-
-  return _loadPromise;
+// ── Global Exposure ─────────────────────────────────────────
+if (typeof window !== 'undefined') {
+  // @ts-ignore
+  window.initSTT = initSTT;
+  // @ts-ignore
+  window.transcribeOnDevice = transcribeOnDevice;
 }
 
-/**
- * transcribeOnDevice(blob)
- * @param {Blob} blob — audio/webm blob from MediaRecorder
- * @returns {Promise<string>} — e.g. "BP 150 by 90 vajan 54 kilo"
- *
- * Works fully offline after first load.
- * language: 'hindi' → model uses multilingual Hindi weights
- * task: 'transcribe' → preserves original language (not translate to English)
- */
-export async function transcribeOnDevice(blob) {
-  const stt = await initSTT();
+let transcriber = null;
+let modelLoading = false;
 
-  // Convert Blob → object URL for the pipeline
-  const url = URL.createObjectURL(blob);
+export async function initSTT() {
+  if (transcriber) return transcriber;
+  if (modelLoading) {
+    while(modelLoading) await new Promise(r => setTimeout(r, 100));
+    return transcriber;
+  }
+  
+  modelLoading = true;
+  console.log('[sttAgent] Initializing Whisper model...');
+  
   try {
-    const out = await stt(url, {
+    // Model: Xenova/whisper-tiny (multilingual, 40MB quantized)
+    transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+      quantized: true,
+    });
+    console.log('[sttAgent] Whisper model loaded successfully');
+  } catch (e) {
+    console.error('[sttAgent] Model load failed:', e);
+    transcriber = null;
+  } finally {
+    modelLoading = false;
+  }
+  return transcriber;
+}
+
+// Background// Preload on app start
+if (typeof window !== 'undefined') {
+  console.log('[sttAgent] VERSION: 2026-05-02-1512');
+  initSTT();
+}
+
+export async function transcribeOnDevice(audioBlob) {
+  const stt = await initSTT();
+  if (!stt) {
+    console.error('[sttAgent] Transcriber not available');
+    return '';
+  }
+  
+  try {
+    const output = await stt(audioBlob, {
       language: 'hindi',
       task: 'transcribe',
-      // chunk_length_s keeps memory low on Redmi 9A
       chunk_length_s: 30,
       stride_length_s: 5,
     });
-    return (out.text ?? '').trim();
-  } finally {
-    URL.revokeObjectURL(url);
+    return output.text.trim();
+  } catch (e) {
+    console.error('[sttAgent] Transcription failed:', e);
+    return '';
   }
-}
-
-/**
- * warmUpSTT()
- * Call this on app load to pre-fetch the model so the first mic use is instant.
- * Fire-and-forget — errors are swallowed.
- */
-export function warmUpSTT() {
-  initSTT().catch((err) =>
-    console.warn('[sttAgent] Warm-up failed (offline first load?):', err)
-  );
 }
