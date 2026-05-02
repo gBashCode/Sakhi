@@ -29,28 +29,20 @@ export default function Splash() {
     setStage("downloading");
     setStatusText("Whisper AI model download ho raha hai...");
 
-    // Simulate progress while model loads (actual load is async)
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 90) {
-          clearInterval(interval);
-          return 90;
-        }
-        return p + Math.random() * 8;
-      });
-    }, 400);
-
     try {
-      await initSTT();
-      clearInterval(interval);
+      // Pass progress handler to initSTT
+      await initSTT((p) => {
+        setProgress(p);
+        if (p > 99) setStatusText("AI ready hai! ✅");
+        else setStatusText(`Downloading: ${p}%`);
+      });
+      
       setProgress(100);
-      setStatusText("AI ready hai! ✅");
       setStage("done");
       localStorage.setItem(FIRST_INSTALL_KEY, "1");
-      setTimeout(() => nav("/language"), 1200);
+      setTimeout(() => nav("/language"), 1500);
     } catch (e) {
-      clearInterval(interval);
-      // Even if model fails, allow app to continue — server fallback will handle it
+      // Even if model fails, allow app to continue
       setProgress(100);
       setStatusText("AI baad mein load hogi. Continue karo.");
       setStage("done");

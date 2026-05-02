@@ -1,47 +1,56 @@
 import { pipeline, env } from '@xenova/transformers';
 
+// Configuration for offline-first operation
 env.allowLocalModels = true;
-env.allowRemoteModels = false; // STOP internet download
-env.useBrowserCache = false;
-env.backends.onnx.wasm.numThreads = 1;
-env.backends.onnx.wasm.proxy = false;
+env.allowRemoteModels = true; // Allow first-time download
+env.backends.onnx.wasm.numThreads = 1; // Save RAM for 2GB devices
+env.backends.onnx.wasm.wasmPaths = '/wasm/'; // Local WASM files
 
 let hfPipeline = null;
-let modelStatus = 'loading'; 
+let modelStatus = 'idle'; // idle, loading, ready, error
 
-export async function initSTT() {
+/**
+ * Initialize the Whisper model
+ * @param {Function} progressCallback - Callback for download progress
+ */
+export async function initSTT(progressCallback = null) {
   if (hfPipeline) return hfPipeline;
+  
+  modelStatus = 'loading';
   try {
-    console.log('Loading Whisper from APK assets...');
+    console.log('Initializing Whisper Multilingual Offline Engine...');
+    // 'Xenova/whisper-tiny' is ~40MB and supports Hindi/Kannada
     hfPipeline = await pipeline(
       'automatic-speech-recognition',
-      '/models/whisper-small.hi', 
+      'Xenova/whisper-tiny', 
       {
         quantized: true,
-        progress_callback: (p) => console.log('Model loading:', p)
+        progress_callback: (p) => {
+          if (progressCallback && p.status === 'progress') {
+            progressCallback(Math.round(p.progress));
+          }
+          console.log('Model loading status:', p.status, p.progress || '');
+        }
       }
     );
     modelStatus = 'ready';
     return hfPipeline;
   } catch (e) {
     modelStatus = 'error';
-    console.error('Failed to load bundled model:', e);
-    return null;
+    console.error('STT Initialization failed:', e);
+    throw e;
   }
-}
-
-// Start loading background model
-if (typeof window !== 'undefined') {
-  initSTT();
 }
 
 export function getModelStatus() { return modelStatus; }
 export function isModelReady() { return modelStatus === 'ready'; }
-export function stopListening() { /* native auto-stops */ }
 
-export async function transcribeOffline(audioBlob) {
+/**
+ * Transcribe using the on-device Whisper model
+ */
+export async function transcribeOnDevice(audioBlob, language = 'hindi') {
   const stt = await initSTT();
-  if (!stt) throw new Error('AI model not found in app. Reinstall APK.');
+  if (!stt) throw new Error('Offline AI model not ready');
 
   const arrayBuffer = await audioBlob.arrayBuffer();
   const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -49,87 +58,90 @@ export async function transcribeOffline(audioBlob) {
   const audioData = audioBuffer.getChannelData(0);
 
   const output = await stt(audioData, {
-    language: 'hindi',
+    chunk_length_s: 30,
+    stride_length_s: 5,
+    language: language,
     task: 'transcribe',
-    chunk_length_s: 15,
-    stride_length_s: 3,
     return_timestamps: false,
   });
+
   return output.text.trim();
 }
 
-// ── FEATURE 1: Primary Android Native, Fallback HF ─────────────────────────
+/**
+ * Main entry point: Hybrid STT
+ * 1. Try Native Android (Faster, but usually online)
+ * 2. Fallback to On-Device Whisper (100% Offline)
+ */
 export async function transcribeRegional(language = 'hi-IN') {
-  return new Promise(async (resolve, reject) => {
-    // 1. Primary: Try Android Native STT First
+  return new Promise(async (resolve) => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      console.log("Using Android Native STT...");
+    
+    // Convert 'hi-IN' to 'hindi' for Whisper
+    const whisperLang = language.startsWith('kn') ? 'kannada' : 'hindi';
+
+    if (SpeechRecognition && navigator.onLine) {
+      console.log('Attempting Native STT...');
       const rec = new SpeechRecognition();
       rec.lang = language;
       rec.continuous = false;
       rec.interimResults = false;
-      rec.onresult = e => {
-        resolve(e.results[0][0].transcript);
+
+      rec.onresult = (e) => resolve(e.results[0][0].transcript);
+      rec.onerror = async () => {
+        console.warn('Native STT failed, switching to Offline AI...');
+        resolve(await runOfflineWhisper(whisperLang));
       };
-      rec.onerror = async e => {
-        console.warn("Native STT error:", e.error, "- falling back to offline Whisper");
-        resolve(await runFallback(language));
-      };
+      
       try {
         rec.start();
+        // Timeout for native STT if it hangs
+        setTimeout(() => { try { rec.stop(); } catch(e) {} }, 10000);
         return;
       } catch (e) {
-         console.warn("Native STT start failed - falling back to offline Whisper");
-         resolve(await runFallback(language));
-         return;
+        resolve(await runOfflineWhisper(whisperLang));
       }
     } else {
-      console.log("Native STT not supported, using offline Whisper");
-      resolve(await runFallback(language));
+      console.log('Offline or Native unsupported, using Whisper...');
+      resolve(await runOfflineWhisper(whisperLang));
     }
   });
 }
 
-// Helper to record 8 seconds and pass to offline Whisper
-async function runFallback(language) {
+/**
+ * Helper to record audio and run through Whisper
+ */
+async function runOfflineWhisper(whisperLang) {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new MediaRecorder(stream);
-    const audioChunks = [];
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
 
-    mediaRecorder.ondataavailable = (e) => {
-      if (e.data.size > 0) audioChunks.push(e.data);
-    };
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
     return new Promise((resolve) => {
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: 'audio/webm' });
         try {
-          const text = await transcribeOffline(audioBlob);
+          const text = await transcribeOnDevice(blob, whisperLang);
           resolve(text);
-        } catch(err) {
-          console.error("Offline whisper failed:", err);
-          // 3. Fallback to server if all offline fails
-          if (navigator.onLine) {
-             const formData = new FormData();
-             formData.append('file', audioBlob, 'audio.webm');
-             const res = await fetch('https://sakhi-api.onrender.com/api/transcribe', {
-               method: 'POST', body: formData
-             });
-             const data = await res.json();
-             resolve(data.text);
-          } else {
-             resolve("");
-          }
+        } catch (err) {
+          console.error('Offline Whisper failed:', err);
+          resolve('');
         }
       };
-      mediaRecorder.start();
-      setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 8000);
+      
+      recorder.start();
+      // Record for 8 seconds
+      setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 8000);
     });
   } catch (e) {
-    console.error("Mic error:", e);
-    return "";
+    console.error('Mic error in offline mode:', e);
+    return '';
   }
+}
+
+export function stopListening() {
+  // Logic to stop current recording if needed
 }
