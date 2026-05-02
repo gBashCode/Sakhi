@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     androidScheme: 'https', // CRITICAL FIX
-    cleartext: true
+    cleartext: true,
+    allowNavigation: ['huggingface.co', '*.huggingface.co']
   }
 };
 
