@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backups and temporary files
+backup_ai/
+temp_lovable/
+sakhi.db
+venv/
+.env
