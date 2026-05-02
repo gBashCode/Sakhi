@@ -28,3 +28,4 @@ backup_ai/
 temp_lovable/
 venv/
 .env
+public/models/

@@ -54,8 +54,8 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col px-6 py-10 pattern-organic">
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-mic">
-          <ShieldCheck className="w-8 h-8 text-primary-foreground" />
+        <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-lg border border-slate-100 p-1">
+          <img src="/logo.png" alt="Sakhi Logo" className="w-full h-full object-contain drop-shadow-sm" />
         </div>
         <h2 className="mt-6 text-3xl font-display text-primary">{t.welcome} 🙏</h2>
         <p className="text-muted-foreground mt-1">{t.tagline}</p>

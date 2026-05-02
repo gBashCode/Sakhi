@@ -19,12 +19,16 @@ function loadVoices() {
 }
 
 // Android needs this
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.speechSynthesis) {
   window.speechSynthesis.onvoiceschanged = loadVoices;
   loadVoices(); // Load immediately
 }
 
 export function speakRegional(text, language = 'hi-IN') {
+  if (!window.speechSynthesis) {
+    console.warn('Speech synthesis is not supported on this device');
+    return;
+  }
   // Stop any current speech
   window.speechSynthesis.cancel();
 

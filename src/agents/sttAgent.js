@@ -1,10 +1,9 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// ── Environment Configuration ──────────────────────────────────────────────
-env.allowLocalModels = false;
-env.allowRemoteModels = true;
+// CRITICAL FIX: Disable remote download, use bundled model
+env.allowLocalModels = true;
+env.allowRemoteModels = false; // STOP internet download
 env.useBrowserCache = true;
-env.remoteHost = 'https://huggingface.co';
 env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.proxy = false;
 env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
@@ -151,18 +150,21 @@ export async function initSTT() {
     return transcriber;
   }
   modelLoading = true;
+  console.log('Loading bundled AI model from APK...');
   try {
+    // FIX: Load from /models/ folder inside APK
     transcriber = await pipeline(
       'automatic-speech-recognition',
-      'Xenova/whisper-small',
+      '/models/whisper-small.hi', // Local path
       {
         quantized: true,
         progress_callback: (p) => { if (progressCallback) progressCallback(p); }
       }
     );
     modelReady = true;
+    console.log('Model loaded from APK ✅');
   } catch (e) {
-    console.error('[sttAgent] Whisper load failed:', e);
+    console.error('Bundled model failed:', e);
   }
   modelLoading = false;
   return transcriber;

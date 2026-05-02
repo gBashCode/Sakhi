@@ -9,7 +9,7 @@ import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 
 import { useVoice } from "@/hooks/useVoice";
-import { speakHindi } from "@/agents/ttsAgent";
+import { speakRegional } from "@/agents/ttsAgent";
 
 type Phase = "idle" | "listening" | "processing" | "result" | "speaking";
 
