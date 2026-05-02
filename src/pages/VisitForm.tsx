@@ -10,6 +10,7 @@ import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
 import { getNextAction } from "@/agents/copilotAgent";
 import { transcribeOnDevice, initSTT, isModelReady } from "@/agents/sttAgent";
+import { generateVisitSummary } from "@/agents/summaryAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
@@ -36,6 +37,7 @@ export default function VisitForm() {
   const [bpDia, setBpDia] = useState("");
   const [weight, setWeight] = useState("");
   const [symptoms, setSymptoms] = useState("");
+  const [summary, setSummary] = useState("");
   const [risk, setRisk] = useState<Risk>("low");
   const [glowField, setGlowField] = useState<string | null>(null);
   // Triage state from riskAgent
@@ -73,6 +75,7 @@ export default function VisitForm() {
     if (result?.text) setTranscript(result.text);
     if (result?.risk) { setRisk(result.risk.level as Risk); setTriage(result.risk); }
     if (result?.action) setSalah(result.action);
+    if (result?.summary) setSummary(result.summary);
   }, [result]);
 
   // ── Risk + Triage + Copilot: recalculate on every form change ─────────────
@@ -89,7 +92,15 @@ export default function VisitForm() {
     // CalmOps: compute single next action
     const visitSnapshot = { ifaGiven: false, ttDone: false, deviceTs: Date.now() };
     setSalah(getNextAction(patient ?? {}, visitSnapshot, t2));
-  }, [bpSys, bpDia, symptoms, weight, patient]);
+    
+    // Auto-update summary if not using voice (manual edit fallback)
+    if (!aiLoading && !recording) {
+      const newSummary = generateVisitSummary(patient, { 
+        patient_name: patient?.name, age, bp_sys: sys, bp_dia: dia, weight_kg: wt, symptoms: sympArr 
+      }, t2, lang.startsWith('kn') ? 'kn' : 'hi');
+      setSummary(newSummary);
+    }
+  }, [bpSys, bpDia, symptoms, weight, patient, lang]);
 
   // ── Glow clear ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -116,6 +127,7 @@ export default function VisitForm() {
         weight:    wtNum,
         symptoms,
         riskLevel,
+        summary,
         deviceTs:  Date.now(),
         synced:    0,
       });
@@ -421,6 +433,28 @@ export default function VisitForm() {
               rows={3}
               className="w-full bg-transparent outline-none text-foreground resize-none"
             />
+          </div>
+        </div>
+
+        {/* AI Visit Summary Note */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-muted-foreground block">AI Visit Summary Note</label>
+            <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold">Generated</span>
+          </div>
+          <div className="bg-emerald-50/40 dark:bg-emerald-900/10 rounded-2xl px-4 py-4 border border-emerald-500/20 shadow-sm">
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center shrink-0">
+                <span className="text-sm">🤖</span>
+              </div>
+              <textarea
+                value={summary}
+                onChange={(e) => setSummary(e.target.value)}
+                placeholder="AI will generate a summary..."
+                rows={5}
+                className="w-full bg-transparent outline-none text-sm font-medium text-foreground resize-none leading-relaxed"
+              />
+            </div>
           </div>
         </div>
       </div>

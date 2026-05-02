@@ -5,6 +5,7 @@ import { parseMedical } from '@/agents/nerAgent';
 import { triageRisk } from '@/agents/riskAgent';
 import { getNextAction } from '@/agents/copilotAgent';
 import { generateAllDocuments } from '@/agents/documentAgent';
+import { generateVisitSummary } from '@/agents/summaryAgent';
 
 export function useVoice(patient, language = 'hi-IN') {
   const [recording, setRecording] = useState(false);
@@ -56,8 +57,9 @@ export function useVoice(patient, language = 'hi-IN') {
       const medical = parseMedical(text);
       const risk = triageRisk({...medical, age: patient?.age});
       const action = getNextAction(patient, null, risk, language === 'hi-IN' ? 'hi' : 'kn');
+      const summary = generateVisitSummary(patient, medical, risk, language === 'hi-IN' ? 'hi' : 'kn');
 
-      setResult({text, medical, risk, action});
+      setResult({text, medical, risk, action, summary});
 
       // NEW: GENERATE ALL DOCUMENTS INSTANTLY
       const docs = generateAllDocuments(patient, medical, risk, action);

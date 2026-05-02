@@ -19,6 +19,7 @@ export interface DBVisit {
   patientId: string;
   bpSys?: number;      // systolic BP
   riskLevel?: string;  // 'low' | 'medium' | 'high'
+  summary?: string;    // AI generated clinical summary
   deviceTs: number;    // timestamp from device at entry time
   synced: number;      // 0 = unsynced, 1 = synced
   [key: string]: unknown; // allow arbitrary visit fields
@@ -36,7 +37,7 @@ class SakhiDB extends Dexie {
 
   constructor() {
     super('SakhiAI');
-    this.version(1).stores({
+    this.version(2).stores({
       patients: '++id, name',
       visits:   '++id, clientId, patientId, bpSys, riskLevel, deviceTs, synced',
       meta:     'key',
