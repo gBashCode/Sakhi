@@ -12,6 +12,7 @@ import { getNextAction } from "@/agents/copilotAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
+import AnemiaChecker from "@/components/AnemiaChecker";
 import { toast } from "sonner";
 
 // ── Risk engine — thin wrapper that delegates to nerAgent (single source of truth) ──
@@ -41,6 +42,10 @@ export default function VisitForm() {
   } | null>(null);
   // Copilot: single CalmOps action string
   const [salah, setSalah] = useState<string>("");
+  // Vision: anemia check result
+  const [anemiaResult, setAnemiaResult] = useState<{
+    risk: string; score: number; confidence: string; detail: string;
+  } | null>(null);
 
   // ── useVoice hook (real Whisper transcription) ────────────────────────────
   const { recording, transcribing, transcript, start, stop } = useVoice();
@@ -166,6 +171,36 @@ export default function VisitForm() {
         )}
         {transcript && <div className="w-full mt-2"><VoiceTranscript text={transcript} /></div>}
       </div>
+
+      {/* ── Anemia Check (camera pallor screening) ───────────────────── */}
+      <div className="mt-4 flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Optional: conjunctival/palmar pallor check</p>
+        <AnemiaChecker onResult={setAnemiaResult} />
+      </div>
+      {anemiaResult && (
+        <motion.div
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          data-testid="anemia-result"
+          className={`rounded-2xl px-4 py-3 border mt-2 ${
+            anemiaResult.risk === "anemia_risk"
+              ? "bg-destructive/10 border-destructive/40 text-destructive"
+              : anemiaResult.risk === "borderline"
+              ? "bg-accent/10 border-accent/30 text-accent"
+              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+          }`}
+        >
+          <div className="font-bold text-sm">
+            🩸 Anemia check:{" "}
+            {anemiaResult.risk === "anemia_risk" ? "Risk detected" :
+             anemiaResult.risk === "borderline"  ? "Borderline" : "Normal"}
+            <span className="ml-2 font-normal text-xs opacity-70">
+              ({(anemiaResult.score * 100).toFixed(0)}% · {anemiaResult.confidence})
+            </span>
+          </div>
+          <p className="text-xs mt-0.5 opacity-80">{anemiaResult.detail}</p>
+        </motion.div>
+      )}
 
       {/* ── Form fields ────────────────────────────────────────────────── */}
       <div className="mt-6 space-y-4">
