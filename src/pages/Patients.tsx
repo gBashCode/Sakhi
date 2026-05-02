@@ -9,6 +9,8 @@ import EmptyState from "@/components/EmptyState";
 import OfflineBadge from "@/components/OfflineBadge";
 import { syncToServer } from "@/services/sync";
 import { toast } from "sonner";
+// @ts-ignore
+import { checkDueMeds } from "@/agents/drugAgent";
 
 type Tab = "all" | "due" | "high";
 
@@ -150,6 +152,28 @@ export default function Patients() {
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {t.age}: {p.age} • {t.lastVisit}: {daysAgo(p.lastVisit)}
                 </div>
+                {/* ── Drug due badges ── */}
+                {(() => {
+                  const dueMeds = checkDueMeds(p);
+                  if (!dueMeds.length) return null;
+                  return (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {dueMeds.map((d: any) => (
+                        <span
+                          key={d.drug}
+                          title={d.msg}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
+                            d.urgency === "overdue"
+                              ? "bg-destructive animate-pulse"
+                              : "bg-orange-500"
+                          }`}
+                        >
+                          {d.drug}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
