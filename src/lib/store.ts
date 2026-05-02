@@ -55,6 +55,8 @@ type Store = {
   setLang: (l: Lang) => void;
   loggedIn: boolean;
   setLoggedIn: (v: boolean) => void;
+  userName: string;
+  setUserName: (n: string) => void;
 
   /* ── patients ── */
   patients: Patient[];
@@ -249,6 +251,11 @@ export const useStore = create<Store>((set) => ({
   },
   loggedIn: false,
   setLoggedIn: (v) => set({ loggedIn: v }),
+  userName: localStorage.getItem("sakhi_username") || "Asha",
+  setUserName: (n) => {
+    localStorage.setItem("sakhi_username", n);
+    set({ userName: n });
+  },
 
   /* patients */
   patients: initialPatients,

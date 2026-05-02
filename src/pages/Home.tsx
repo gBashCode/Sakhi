@@ -10,6 +10,7 @@ export default function Home() {
   const nav = useNavigate();
   const t = useT();
   const patients = useStore((s) => s.patients);
+  const userName = useStore((s) => s.userName);
   const markReferred = useStore((s) => s.markReferred);
   const pending = patients.filter((p) => !p.synced).length;
   const highRisk = patients.filter((p) => p.risk === "high").length;
@@ -30,7 +31,7 @@ export default function Home() {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-muted-foreground text-sm">{t.welcome},</p>
-          <h1 className="text-3xl font-display text-primary">Asha Didi</h1>
+          <h1 className="text-3xl font-display text-primary">{userName} Didi</h1>
           <p className="text-xs text-muted-foreground mt-0.5">{t.asha} • Tumkur</p>
         </div>
         <OfflineBadge />
