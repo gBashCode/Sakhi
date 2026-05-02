@@ -1,10 +1,3 @@
-/**
- * VisitForm.tsx
- * Saves visits to Dexie (offline-first), uses useVoice for mic transcription,
- * calculates risk, routes to HIGH-RISK alert when needed.
- *
- * CRITICAL: Never delete onClick, onChange, data-field, data-action, or db.visits.add()
- */
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -13,36 +6,17 @@ import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
 import { useVoice } from "@/hooks/useVoice";
 import { db } from "@/lib/db";
+import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
 import { toast } from "sonner";
 
-// ── Risk engine (inline, mirrors getRisk from utils) ──────────────────────────
+// ── Risk engine — thin wrapper that delegates to nerAgent (single source of truth) ──
+// Converts symptom string "edema, fever" → string[] for nerCalcRisk
 function calcRisk(sys: number | null, dia: number | null, symp: string): Risk {
-  if ((sys && sys >= 140) || (dia && dia >= 90)) return "high";
-  const s = symp.toLowerCase();
-  if (s.includes("swelling") || s.includes("bleeding")) return "high";
-  if ((sys && sys >= 130) || (dia && dia >= 85)) return "medium";
-  if (s.includes("headache") || s.includes("fever")) return "medium";
-  return "low";
-}
-
-// ── Vitals parser (mirrors parseVitals from utils) ────────────────────────────
-function parseVitals(text: string): { bpSys?: string; bpDia?: string; weight?: string; symptoms?: string } {
-  const result: { bpSys?: string; bpDia?: string; weight?: string; symptoms?: string } = {};
-  // BP: "BP 150 by 90" | "BP 150/90" | "150 over 90"
-  const bp = text.match(/(?:bp\s*)?(\d{2,3})\s*(?:by|\/|over)\s*(\d{2,3})/i);
-  if (bp) { result.bpSys = bp[1]; result.bpDia = bp[2]; }
-  else { const s = text.match(/(?:bp)\s*(\d{2,3})/i); if (s) result.bpSys = s[1]; }
-  // Weight: "58 kg"
-  const wt = text.match(/(\d{2,3})\s*(?:kg|kilo)/i);
-  if (wt) result.weight = wt[1];
-  // Symptoms
-  const kw = ["headache","fever","swelling","nausea","bleeding","pain","fatigue","vomiting","dizziness"];
-  const found = kw.filter((k) => text.toLowerCase().includes(k));
-  if (found.length) result.symptoms = found.join(", ");
-  return result;
+  const sympArr = symp ? symp.split(/,\s*/).filter(Boolean) : [];
+  return nerCalcRisk(sys, dia, sympArr) as Risk;
 }
 
 export default function VisitForm() {
@@ -76,17 +50,17 @@ export default function VisitForm() {
     }
   }, [glowField]);
 
-  // ── Parse transcript into form fields ─────────────────────────────────────
+  // ── Parse transcript → form fields via nerAgent ──────────────────────────
   useEffect(() => {
     if (!transcript) return;
-    const parsed = parseVitals(transcript);
-    if (parsed.bpSys) { setBpSys(parsed.bpSys); setGlowField("bp"); }
-    if (parsed.bpDia) setBpDia(parsed.bpDia);
-    if (parsed.weight) { setWeight(parsed.weight); setGlowField("weight"); }
-    if (parsed.symptoms) {
+    const parsed = parseMedical(transcript);
+    if (parsed.bp_sys)    { setBpSys(String(parsed.bp_sys));  setGlowField("bp"); }
+    if (parsed.bp_dia)    setBpDia(String(parsed.bp_dia));
+    if (parsed.weight_kg) { setWeight(String(parsed.weight_kg)); setGlowField("weight"); }
+    if (parsed.symptoms.length) {
       setSymptoms((prev) => {
         const existing = prev ? prev.split(", ") : [];
-        const merged = [...new Set([...existing, ...parsed.symptoms!.split(", ")])];
+        const merged = [...new Set([...existing, ...parsed.symptoms])];
         return merged.join(", ");
       });
       setGlowField("symptoms");
