@@ -1,16 +1,32 @@
 import { motion } from "framer-motion";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mic, Bell, AlertTriangle, CloudUpload, Users, Syringe, ShieldAlert } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import OfflineBadge from "@/components/OfflineBadge";
+import { db } from "@/lib/db";
 
 export default function Home() {
   const nav = useNavigate();
   const t = useT();
   const patients = useStore((s) => s.patients);
+  const setPatients = useStore((s) => s.setPatients);
   const pending = patients.filter((p) => !p.synced).length;
   const highRisk = patients.filter((p) => p.risk === "high").length;
+
+  // Load from IndexedDB on mount (offline-first)
+  useEffect(() => {
+    const loadLocal = async () => {
+      const local = await db.patients.toArray();
+      if (local.length > 0) {
+        setPatients(
+          local.map((p) => ({ ...p, synced: p.synced === 1 }))
+        );
+      }
+    };
+    loadLocal();
+  }, [setPatients]);
 
   const stats = [
     { icon: Users, label: t.visited, value: patients.length, tint: "text-primary" },

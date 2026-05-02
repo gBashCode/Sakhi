@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useRecorder } from '../hooks/useRecorder';
-import { transcribeBlob } from '../hooks/useWhisper';
+import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { useVoice } from '../hooks/useVoice';
 import { parseVitals } from '../utils/parseVitals';
 import { getRisk } from '../utils/riskEngine';
 import { db } from '../db';
@@ -11,57 +11,45 @@ export default function VisitForm() {
   const patientId = searchParams.get('patientId');
   const navigate = useNavigate();
 
-  const { recording, start, stop } = useRecorder();
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [transcript, setTranscript] = useState('');
+  // ── Voice / Whisper ────────────────────────────────────────────────────────
+  const { recording, transcribing, transcript, start, stop } = useVoice();
 
   const [bpSys, setBpSys] = useState('');
   const [bpDia, setBpDia] = useState('');
   const [weight, setWeight] = useState('');
   const [symptoms, setSymptoms] = useState([]);
 
+  // Auto-fill form fields whenever a new transcript arrives
   useEffect(() => {
-    const handleAudio = async (e) => {
-      setIsTranscribing(true);
-      try {
-        const text = await transcribeBlob(e.detail);
-        setTranscript(text);
-        
-        const data = parseVitals(text);
-        if (data.bpSys) setBpSys(data.bpSys);
-        if (data.bpDia) setBpDia(data.bpDia);
-        if (data.weight) setWeight(data.weight);
-        if (data.symptoms.length > 0) setSymptoms(data.symptoms);
-      } catch (err) {
-        console.error('Transcription failed:', err);
-      } finally {
-        setIsTranscribing(false);
-      }
-    };
+    if (!transcript) return;
+    const data = parseVitals(transcript);
+    if (data.bpSys)              setBpSys(data.bpSys);
+    if (data.bpDia)              setBpDia(data.bpDia);
+    if (data.weight)             setWeight(data.weight);
+    if (data.symptoms?.length)   setSymptoms(data.symptoms);
+  }, [transcript]);
 
-    window.addEventListener('audio-recorded', handleAudio);
-    return () => window.removeEventListener('audio-recorded', handleAudio);
-  }, []);
-
+  // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    const riskLevel = getRisk({ bpSys: parseInt(bpSys), bpDia: parseInt(bpDia), symptoms });
+    const riskLevel = getRisk({
+      bpSys: parseInt(bpSys),
+      bpDia: parseInt(bpDia),
+      symptoms,
+    });
     await db.visits.add({
       clientId: crypto.randomUUID(),
       patientId,
-      bpSys: parseInt(bpSys) || null,
-      bpDia: parseInt(bpDia) || null,
-      weight: parseFloat(weight) || null,
+      bpSys:    parseInt(bpSys)    || null,
+      bpDia:    parseInt(bpDia)    || null,
+      weight:   parseFloat(weight) || null,
       symptoms,
       riskLevel,
-      deviceTs: new Date(),
-      synced: 0
+      deviceTs: Date.now(),
+      synced:   0,
     });
-    
-    if (riskLevel === 'high') {
-      navigate('/alert');
-    } else {
-      navigate('/patients');
-    }
+
+    if (riskLevel === 'high') navigate('/alert');
+    else                      navigate('/patients');
   };
 
   return (
@@ -73,40 +61,78 @@ export default function VisitForm() {
 
       <div className="p-4 flex-1">
         <div className="bg-white rounded-2xl shadow p-6 mb-6">
-          <div className="flex flex-col items-center gap-4 mb-6">
-            <button 
-              onMouseDown={start} 
+
+          {/* ── Mic button — above BP fields ────────────────────────────── */}
+          <div className="flex flex-col items-center gap-3 mb-6">
+            <button
+              onMouseDown={start}
               onMouseUp={stop}
               onTouchStart={start}
               onTouchEnd={stop}
-              className={`w-24 h-24 rounded-full text-white font-bold shadow-xl transition-all ${recording ? 'bg-red-600 scale-110 animate-pulse' : 'bg-blue-600 hover:bg-blue-700 hover:scale-105'}`}
+              aria-label={recording ? 'Stop recording' : 'Start recording'}
+              className={`
+                w-16 h-16 rounded-full flex items-center justify-center
+                text-white shadow-xl transition-all select-none
+                ${recording
+                  ? 'bg-red-600 scale-110 animate-pulse'
+                  : 'bg-blue-600 hover:bg-blue-700 hover:scale-105 active:scale-95'}
+              `}
             >
-              {recording ? 'Mic On' : 'Hold Mic'}
+              {recording ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
             </button>
-            {isTranscribing && <p className="text-gray-500 animate-pulse">Transcribing via Whisper...</p>}
-            {transcript && <p className="text-sm text-gray-600 italic">"{transcript}"</p>}
+
+            {transcribing && (
+              <p className="flex items-center gap-2 text-gray-500 animate-pulse text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Transcribing with Whisper AI…
+              </p>
+            )}
+
+            {transcript && !transcribing && (
+              <p className="text-sm text-gray-600 italic text-center max-w-xs">
+                "{transcript}"
+              </p>
+            )}
           </div>
 
+          {/* ── BP fields (now auto-filled by voice) ────────────────────── */}
           <div className="space-y-4">
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm text-gray-600 mb-1">BP Sys</label>
-                <input type="number" value={bpSys} onChange={e => setBpSys(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-gray-50" />
+                <input
+                  type="number"
+                  value={bpSys}
+                  onChange={(e) => setBpSys(e.target.value)}
+                  placeholder="e.g. 150"
+                  className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
               </div>
               <div className="flex-1">
                 <label className="block text-sm text-gray-600 mb-1">BP Dia</label>
-                <input type="number" value={bpDia} onChange={e => setBpDia(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-gray-50" />
+                <input
+                  type="number"
+                  value={bpDia}
+                  onChange={(e) => setBpDia(e.target.value)}
+                  placeholder="e.g. 90"
+                  className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
               </div>
             </div>
-            
+
             <div>
               <label className="block text-sm text-gray-600 mb-1">Weight (kg)</label>
-              <input type="number" value={weight} onChange={e => setWeight(e.target.value)} className="w-full px-3 py-2 border rounded-lg bg-gray-50" />
+              <input
+                type="number"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
             </div>
-            
+
             <div>
               <label className="block text-sm text-gray-600 mb-1">Symptoms</label>
-              <div className="px-3 py-2 border rounded-lg bg-gray-50 min-h-[42px]">
+              <div className="px-3 py-2 border rounded-lg bg-gray-50 min-h-[42px] text-sm text-gray-700">
                 {symptoms.length > 0 ? symptoms.join(', ') : 'None detected'}
               </div>
             </div>
@@ -115,7 +141,10 @@ export default function VisitForm() {
       </div>
 
       <div className="p-4 bg-white border-t border-gray-200">
-        <button onClick={handleSave} className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-transform">
+        <button
+          onClick={handleSave}
+          className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-transform"
+        >
           Save Visit Record
         </button>
       </div>

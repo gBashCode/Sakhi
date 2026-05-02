@@ -20,6 +20,7 @@ type Store = {
   loggedIn: boolean;
   setLoggedIn: (v: boolean) => void;
   patients: Patient[];
+  setPatients: (ps: Patient[]) => void;
   addPatient: (p: Patient) => void;
   syncAll: () => void;
 };
@@ -68,7 +69,8 @@ export const useStore = create<Store>((set) => ({
   },
   loggedIn: false,
   setLoggedIn: (v) => set({ loggedIn: v }),
-  patients: initial,
+  patients: initial, // replaced at runtime by IndexedDB data
+  setPatients: (ps) => set({ patients: ps }),
   addPatient: (p) => set((s) => ({ patients: [p, ...s.patients] })),
   syncAll: () => set((s) => ({ patients: s.patients.map((p) => ({ ...p, synced: true })) })),
 }));

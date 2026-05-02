@@ -1,4 +1,6 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// Empty string = relative URLs → Vite proxy forwards to FastAPI at :8000
+// Set VITE_API_URL in .env for production deployments
+const BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export async function login(phone, pin) {
   const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {

@@ -29,3 +29,33 @@ def sync_visits(data: SyncRequest, db: Session = Depends(get_db), current_user: 
         except Exception as e:
             failed.append({"client_id": str(v.client_id), "error": str(e)})
     return {"saved": saved, "failed": failed, "server_ts": datetime.utcnow()}
+
+
+from app.models.patient import Patient
+from typing import Any
+
+@router.post("/sync/patients")
+def sync_patients(
+    data: dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upsert patients sent from the ASHA device."""
+    patients = data.get("patients", [])
+    saved = 0
+    for p in patients:
+        try:
+            existing = db.query(Patient).filter(Patient.id == p.get("id")).first()
+            if existing:
+                continue  # already exists — skip
+            new_patient = Patient(
+                id=p.get("id"),
+                name=p.get("name", "Unknown"),
+                asha_id=current_user.id,
+            )
+            db.add(new_patient)
+            db.commit()
+            saved += 1
+        except Exception:
+            db.rollback()
+    return {"saved": saved, "server_ts": datetime.utcnow()}

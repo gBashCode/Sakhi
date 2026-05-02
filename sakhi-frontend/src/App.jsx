@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { seedData } from './db/seed'
 import Login from './pages/Login'
 import PatientList from './pages/PatientList'
@@ -25,7 +25,7 @@ function App() {
           <Route path="/visit/new" element={<VisitForm />} />
           <Route path="/alert" element={<RiskAlert />} />
           <Route path="/due" element={<DueList />} />
-          <Route path="/" element={<div className="p-4 font-bold text-blue-600">Tailwind Works! Welcome to Sakhi</div>} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
         </Routes>
       </div>
       {!hideTabBar && <TabBar />}

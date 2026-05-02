@@ -4,12 +4,33 @@ import { useState } from "react";
 import { Phone, ShieldCheck } from "lucide-react";
 import { useStore } from "@/lib/store";
 import { useT } from "@/hooks/useT";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function Login() {
   const nav = useNavigate();
   const t = useT();
   const setLoggedIn = useStore((s) => s.setLoggedIn);
   const [phone, setPhone] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post("/api/v1/auth/login", { phone, pin: "0000" });
+      localStorage.setItem("sakhi_token", res.data.access_token);
+      setLoggedIn(true);
+      nav("/home");
+    } catch (err: any) {
+      // Fallback for demo/offline: allow login without backend
+      console.warn("Backend unavailable, using demo mode:", err?.message);
+      setLoggedIn(true);
+      nav("/home");
+      toast.info("Demo mode — backend offline");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex flex-col px-6 py-10 pattern-organic">
@@ -46,14 +67,11 @@ export default function Login() {
 
       <motion.button
         whileTap={{ scale: 0.97 }}
-        disabled={phone.length < 10}
-        onClick={() => {
-          setLoggedIn(true);
-          nav("/home");
-        }}
-        className="w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic disabled:opacity-50"
+        disabled={phone.length < 10 || loading}
+        onClick={handleLogin}
+        className="w-full h-14 bg-gradient-primary text-primary-foreground rounded-3xl font-bold text-lg shadow-mic disabled:opacity-50"
       >
-        {t.sendOtp}
+        {loading ? "Logging in…" : t.sendOtp}
       </motion.button>
     </div>
   );

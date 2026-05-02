@@ -11,7 +11,7 @@ export default function BottomNav() {
     { to: "/alerts", icon: Bell, label: t.alerts },
     { to: "/profile", icon: User, label: t.profile },
   ];
-  if (["/", "/language", "/login", "/splash"].includes(pathname)) return null;
+  if (["/", "/language", "/login", "/splash", "/alert", "/voice"].includes(pathname)) return null;
 
   return (
     <nav className="fixed bottom-0 inset-x-0 z-40 px-4 pb-4 pt-2">

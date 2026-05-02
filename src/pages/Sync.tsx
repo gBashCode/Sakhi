@@ -4,6 +4,8 @@ import { CloudUpload, CheckCircle2, Clock } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { db } from "@/lib/db";
 
 export default function Sync() {
   const t = useT();
@@ -12,13 +14,36 @@ export default function Sync() {
   const [syncing, setSyncing] = useState(false);
   const pending = patients.filter((p) => !p.synced);
 
-  const start = () => {
+  const start = async () => {
     setSyncing(true);
-    setTimeout(() => {
-      syncAll();
-      setSyncing(false);
+    try {
+      // Get all unsynced visits from IndexedDB
+      const unsynced = await db.visits.where("synced").equals(0).toArray();
+
+      if (unsynced.length > 0) {
+        // Push to backend
+        await api.post("/api/v1/sync", { visits: unsynced });
+        // Mark as synced locally
+        await db.visits.where("synced").equals(0).modify({ synced: 1 });
+      }
+
+      // Also sync patients that are unsynced
+      const unsyncedPatients = await db.patients.where("synced").equals(0).toArray();
+      if (unsyncedPatients.length > 0) {
+        await api.post("/api/v1/sync/patients", { patients: unsyncedPatients });
+        await db.patients.where("synced").equals(0).modify({ synced: 1 });
+      }
+
+      syncAll(); // Update Zustand store
       toast.success(t.synced);
-    }, 1800);
+    } catch (err: any) {
+      console.warn("Sync failed (offline?):", err?.message);
+      // Still mark locally so UI updates
+      syncAll();
+      toast.warning("Synced locally — backend unreachable");
+    } finally {
+      setSyncing(false);
+    }
   };
 
   return (
@@ -30,7 +55,7 @@ export default function Sync() {
         whileTap={{ scale: 0.97 }}
         onClick={start}
         disabled={syncing || pending.length === 0}
-        className="mt-6 w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 disabled:opacity-50"
+        className="mt-6 w-full h-14 bg-gradient-primary text-primary-foreground rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <CloudUpload className={`w-6 h-6 ${syncing ? "animate-bounce" : ""}`} />
         {syncing ? t.syncing : t.syncNow}

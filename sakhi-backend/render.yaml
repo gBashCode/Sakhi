@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sakhi-api
+    runtime: python
+    region: singapore   # closest to India
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:///./sakhi.db   # swap for render postgres in prod
+      - key: SECRET_KEY
+        generateValue: true           # Render auto-generates a secure value
+      - key: REDIS_URL
+        value: redis://localhost:6379/0   # falls back to fakeredis if unavailable
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 10080   # 7 days

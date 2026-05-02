@@ -13,4 +13,12 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     if not user or not verify_pin(data.pin, user.pin_hash):
         raise HTTPException(status_code=400, detail="Incorrect phone or pin")
     token = create_access_token({"sub": str(user.id)})
-    return {"access_token": token}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": str(user.id),
+            "name": user.name,
+            "role": user.role,
+        },
+    }

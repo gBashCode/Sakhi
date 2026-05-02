@@ -5,6 +5,20 @@ import { Mic, ArrowLeft, Sparkles, AlertTriangle, Save, Pencil, User, Calendar, 
 import { useT } from "@/hooks/useT";
 import { useStore, type Patient } from "@/lib/store";
 import { toast } from "sonner";
+import { db } from "@/lib/db";
+import { api } from "@/lib/api";
+
+/** Push all unsynced visits to the backend, mark them synced on success. */
+async function syncToServer() {
+  try {
+    const unsynced = await db.visits.where('synced').equals(0).toArray();
+    if (unsynced.length === 0) return;
+    await api.post('/api/v1/sync', { visits: unsynced });
+    await db.visits.where('synced').equals(0).modify({ synced: 1 });
+  } catch (err) {
+    console.warn('[SakhiAI] Background sync failed (will retry later):', err);
+  }
+}
 
 type Phase = "idle" | "listening" | "processing" | "result";
 
@@ -37,11 +51,37 @@ export default function VoiceEntry() {
     }, 2400);
   };
 
-  const save = () => {
+  const save = async () => {
     if (!patient) return;
+
+    // 1. Always write to IndexedDB first — works completely offline
+    await db.visits.add({
+      clientId: crypto.randomUUID(),
+      patientId: patient.id,
+      bpSys: undefined,
+      riskLevel: patient.risk,
+      deviceTs: Date.now(),
+      synced: 0,
+      // carry full patient snapshot for display
+      name: patient.name,
+      age: patient.age,
+      pregnancyMonth: patient.pregnancyMonth,
+      symptoms: patient.symptoms,
+      recommendation: patient.recommendation,
+    });
+
+    // 2. Also update the in-memory store so the UI refreshes
     addPatient(patient);
-    toast.success(t.saved, { className: "font-semibold" });
-    nav("/home");
+
+    // 3. Try to sync to backend only if online (fire-and-forget)
+    if (navigator.onLine) syncToServer();
+
+    const isHighRisk = patient.risk === "high";
+    toast.success(
+      navigator.onLine ? t.saved : `${t.saved} (offline — will sync later)`,
+      { className: "font-semibold" }
+    );
+    nav(isHighRisk ? "/alert" : "/home");
   };
 
   return (
@@ -204,7 +244,7 @@ export default function VoiceEntry() {
                 variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
                 whileTap={{ scale: 0.97 }}
                 onClick={save}
-                className="w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2"
+                className="w-full h-14 bg-gradient-primary text-primary-foreground rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2"
               >
                 <Save className="w-5 h-5" />
                 {t.save}
