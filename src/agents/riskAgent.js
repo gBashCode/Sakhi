@@ -1,49 +1,26 @@
-/**
- * riskAgent.js — MoHFW ANC Clinical Triage Engine
- */
-
-// ── Global Exposure ──────────────────────────────────────────────────────────
-if (typeof window !== 'undefined') {
-  // @ts-ignore
-  window.triageRisk = triageRisk;
-}
-
-export function triageRisk({bp_sys, bp_dia, weight_kg, symptoms = [], age, gestationalAge}) {
-  const reasons = [];
+export function triageRisk(vitals) {
+  const { bp_sys, bp_dia, symptoms, age } = vitals;
   let level = 'low';
+  const flags = [];
 
-  // FIXED: Return low if no data
-  if (!bp_sys && !bp_dia && symptoms.length === 0) {
-    return {level: 'low', reasons: ['Incomplete data'], protocol: 'Check vitals again', alertColor: 'bg-gray-500'};
-  }
-
+  // High Risk Conditions
   if (bp_sys >= 140 || bp_dia >= 90) {
     level = 'high';
-    reasons.push(`High BP: ${bp_sys || '?'}/${bp_dia || '?'}`);
-  }
-  if (symptoms.includes('edema') && (bp_sys >= 140 || bp_dia >= 90)) {
-    level = 'high';
-    reasons.push('Pre-eclampsia risk');
+    flags.push('hypertension');
+    if (symptoms.includes('edema') || symptoms.includes('headache')) {
+      flags.push('pre_eclampsia_suspect');
+    }
   }
   if (symptoms.includes('bleeding')) {
     level = 'high';
-    reasons.push('Bleeding in pregnancy');
+    flags.push('bleeding');
   }
-  if (weight_kg && weight_kg < 40) {
+  if (age && (age < 18 || age > 35)) {
     level = level === 'high'? 'high' : 'medium';
-    reasons.push('Low maternal weight');
+    flags.push('age_risk');
   }
+  // Medium Risk
+  if (bp_sys >= 130 && bp_sys < 140) level = 'medium';
 
-  const protocol = {
-    high: 'Refer to PHC today. Call 108 if needed.',
-    medium: 'Monitor closely. ANM visit in 3 days.',
-    low: 'Continue routine ANC.'
-  };
-
-  return {
-    level,
-    reasons,
-    protocol: protocol[level],
-    alertColor: {high: 'bg-red-600', medium: 'bg-yellow-500', low: 'bg-green-500'}[level]
-  };
+  return { level, flags, action_required: level === 'high' };
 }

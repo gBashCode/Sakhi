@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { transcribeWithFallback, stopListening, getModelStatus } from '@/agents/sttAgent';
+import { transcribeRegional, stopListening, getModelStatus } from '@/agents/sttAgent';
 import { speakRegional, speakToAsha } from '@/agents/ttsAgent';
 import { parseMedical } from '@/agents/nerAgent';
 import { triageRisk } from '@/agents/riskAgent';
@@ -39,63 +39,34 @@ export function useVoice(patient, language = 'hi-IN') {
     speakRegional('Boliye', language);
 
     try {
-      // 10s wait for the user to speak
-      // Since transcribeWithFallback needs an audioBlob, we must record here!
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
-      const audioChunks = [];
+      // 10s wait for the user to speak. transcribeRegional handles audio buffer natively.
+      const text = await transcribeRegional(language);
 
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunks.push(e.data);
-      };
-
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        stream.getTracks().forEach(track => track.stop());
-
-        try {
-          const text = await transcribeWithFallback(audioBlob);
-
-          if (!text) {
-            speakRegional('Mujhe samajh nahi aaya. Dobara boliye.', language);
-            setLoading(false);
-            setRecording(false);
-            return;
-          }
-
-          // Process with existing agents
-          const medical = parseMedical(text);
-          const risk = triageRisk({...medical, age: patient?.age});
-          const action = getNextAction(patient, medical, risk);
-
-          setResult({text, medical, risk, action});
-
-          if (risk.level === 'high') {
-            speakToAsha(medical.patient_name, `Khatra hai. ${action}`, language);
-          } else {
-            speakToAsha(medical.patient_name, action, language);
-          }
-        } catch (e) {
-          alert(e.message);
-          speakRegional('Kuch galat hua. Phir se koshish karo.', language);
-        }
+      if (!text) {
+        speakRegional('Mujhe samajh nahi aaya. Dobara boliye.', language);
         setLoading(false);
         setRecording(false);
-      };
+        return;
+      }
 
-      mediaRecorder.start();
+      // Process with existing agents
+      const medical = parseMedical(text);
+      const risk = triageRisk({...medical, age: patient?.age});
+      const action = getNextAction(patient, null, risk, language === 'hi-IN' ? 'hi' : 'kn');
 
-      // Auto-stop after 10s recording
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') mediaRecorder.stop();
-      }, 10000);
+      setResult({text, medical, risk, action});
 
+      if (risk.level === 'high') {
+        speakToAsha(medical.patient_name, `Khatra hai. ${action}`, language);
+      } else {
+        speakToAsha(medical.patient_name, action, language);
+      }
     } catch (e) {
       speakRegional('Kuch galat hua. Phir se koshish karo.', language);
       console.error(e);
-      setLoading(false);
-      setRecording(false);
     }
+    setLoading(false);
+    setRecording(false);
   };
 
   const stop = () => {

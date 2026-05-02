@@ -1,52 +1,48 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// CRITICAL: Disable remote download. Force local APK files.
 env.allowLocalModels = true;
 env.allowRemoteModels = false; // STOP internet download
-env.useBrowserCache = false; // Don't use cache, use APK files
-env.backends.onnx.wasm.numThreads = 1; // FIX: 2GB phones crash with 4
+env.useBrowserCache = false;
+env.backends.onnx.wasm.numThreads = 1;
 env.backends.onnx.wasm.proxy = false;
 
-let transcriber = null;
-let modelStatus = 'loading'; // 'loading' | 'ready' | 'error'
+let hfPipeline = null;
+let modelStatus = 'loading'; 
 
 export async function initSTT() {
-  if (transcriber) return transcriber;
-
+  if (hfPipeline) return hfPipeline;
   try {
     console.log('Loading Whisper from APK assets...');
-    modelStatus = 'loading';
-
-    // FIX: Load from bundled /models/ folder in APK
-    transcriber = await pipeline(
+    hfPipeline = await pipeline(
       'automatic-speech-recognition',
-      '/models/whisper-small.hi', // Local path in APK
+      '/models/whisper-small.hi', 
       {
         quantized: true,
         progress_callback: (p) => console.log('Model loading:', p)
       }
     );
-
     modelStatus = 'ready';
-    console.log('Whisper ready from APK ✅');
+    return hfPipeline;
   } catch (e) {
     modelStatus = 'error';
     console.error('Failed to load bundled model:', e);
-    transcriber = null;
+    return null;
   }
-  return transcriber;
 }
 
-// Start loading when app opens
+// Start loading background model
 if (typeof window !== 'undefined') {
   initSTT();
 }
+
+export function getModelStatus() { return modelStatus; }
+export function isModelReady() { return modelStatus === 'ready'; }
+export function stopListening() { /* native auto-stops */ }
 
 export async function transcribeOffline(audioBlob) {
   const stt = await initSTT();
   if (!stt) throw new Error('AI model not found in app. Reinstall APK.');
 
-  // Assuming audioBlob is a WebM/WAV, we need to decode it to Float32Array
   const arrayBuffer = await audioBlob.arrayBuffer();
   const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -62,48 +58,78 @@ export async function transcribeOffline(audioBlob) {
   return output.text.trim();
 }
 
-export function getModelStatus() { return modelStatus; }
-
-export function isModelReady() { return modelStatus === 'ready'; }
-
-export function stopListening() {
-  // Not strictly needed for the offline pipeline logic with MediaRecorder
+// ── FEATURE 1: Primary Android Native, Fallback HF ─────────────────────────
+export async function transcribeRegional(language = 'hi-IN') {
+  return new Promise(async (resolve, reject) => {
+    // 1. Primary: Try Android Native STT First
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      console.log("Using Android Native STT...");
+      const rec = new SpeechRecognition();
+      rec.lang = language;
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.onresult = e => {
+        resolve(e.results[0][0].transcript);
+      };
+      rec.onerror = async e => {
+        console.warn("Native STT error:", e.error, "- falling back to offline Whisper");
+        resolve(await runFallback(language));
+      };
+      try {
+        rec.start();
+        return;
+      } catch (e) {
+         console.warn("Native STT start failed - falling back to offline Whisper");
+         resolve(await runFallback(language));
+         return;
+      }
+    } else {
+      console.log("Native STT not supported, using offline Whisper");
+      resolve(await runFallback(language));
+    }
+  });
 }
 
-// 🔄 PART 3: FRONTEND FALLBACK TO BACKEND
-const API_URL = 'https://sakhi-api.up.railway.app';
-
-export async function transcribeWithFallback(audioBlob) {
-  // 1. Try offline first
+// Helper to record 8 seconds and pass to offline Whisper
+async function runFallback(language) {
   try {
-    if (getModelStatus() === 'ready') {
-      return await transcribeOffline(audioBlob);
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    const audioChunks = [];
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    return new Promise((resolve) => {
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        try {
+          const text = await transcribeOffline(audioBlob);
+          resolve(text);
+        } catch(err) {
+          console.error("Offline whisper failed:", err);
+          // 3. Fallback to server if all offline fails
+          if (navigator.onLine) {
+             const formData = new FormData();
+             formData.append('file', audioBlob, 'audio.webm');
+             const res = await fetch('https://sakhi-api.up.railway.app/api/transcribe', {
+               method: 'POST', body: formData
+             });
+             const data = await res.json();
+             resolve(data.text);
+          } else {
+             resolve("");
+          }
+        }
+      };
+      mediaRecorder.start();
+      setTimeout(() => { if (mediaRecorder.state === 'recording') mediaRecorder.stop(); }, 8000);
+    });
   } catch (e) {
-    console.log('Offline AI failed, trying server...');
+    console.error("Mic error:", e);
+    return "";
   }
-
-  // 2. Fallback to server if online
-  if (navigator.onLine) {
-    try {
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.webm');
-
-      const res = await fetch(`${API_URL}/api/transcribe`, {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      return data.text;
-    } catch (e) {
-      throw new Error('Server bhi fail. Internet check karo.');
-    }
-  }
-
-  throw new Error('Offline AI not ready aur internet nahi hai');
-}
-
-export async function transcribeRegional(audioBlob, lang) {
-  // Backwards compatibility if called directly
-  return await transcribeWithFallback(audioBlob);
 }
