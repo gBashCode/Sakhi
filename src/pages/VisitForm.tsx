@@ -8,6 +8,7 @@ import { useVoice } from "@/hooks/useVoice";
 import { db } from "@/lib/db";
 import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
+import { getNextAction } from "@/agents/copilotAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
@@ -38,11 +39,13 @@ export default function VisitForm() {
   const [triage, setTriage] = useState<{
     level: string; reasons: string[]; protocol: string; urgency: string;
   } | null>(null);
+  // Copilot: single CalmOps action string
+  const [salah, setSalah] = useState<string>("");
 
   // ── useVoice hook (real Whisper transcription) ────────────────────────────
   const { recording, transcribing, transcript, start, stop } = useVoice();
 
-  // ── Risk + Triage: recalculate on BP / symptom change ───────────────────
+  // ── Risk + Triage + Copilot: recalculate on every form change ─────────────
   useEffect(() => {
     const sys = parseInt(bpSys) || null;
     const dia = parseInt(bpDia) || null;
@@ -53,6 +56,9 @@ export default function VisitForm() {
     const age = patient?.age ? parseInt(patient.age) : null;
     const t2 = triageRisk({ bp_sys: sys, bp_dia: dia, weight_kg: wt, symptoms: sympArr, age });
     setTriage(t2);
+    // CalmOps: compute single next action
+    const visitSnapshot = { ifaGiven: false, ttDone: false, deviceTs: Date.now() };
+    setSalah(getNextAction(patient ?? {}, visitSnapshot, t2));
   }, [bpSys, bpDia, symptoms, weight, patient]);
 
   // ── Glow clear ────────────────────────────────────────────────────────────
@@ -194,6 +200,40 @@ export default function VisitForm() {
                 {triage.reasons.join(" · ")}
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* ── Sakhi Salah — CalmOps single action card ────────────────── */}
+        {salah && (
+          <motion.div
+            key={salah}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
+            data-testid="sakhi-salah"
+            className={`rounded-3xl px-5 py-4 border-2 ${
+              triage?.level === "high"
+                ? "bg-destructive/5 border-destructive/40"
+                : triage?.level === "medium"
+                ? "bg-accent/5 border-accent/30"
+                : "bg-emerald-50/60 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800"
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base">🤝</span>
+              <span className="text-[11px] uppercase tracking-widest font-bold text-muted-foreground">
+                Sakhi Salah
+              </span>
+            </div>
+            <p className={`font-bold text-base leading-snug ${
+              triage?.level === "high"
+                ? "text-destructive"
+                : triage?.level === "medium"
+                ? "text-accent"
+                : "text-emerald-700 dark:text-emerald-400"
+            }`}>
+              {salah}
+            </p>
           </motion.div>
         )}
 
