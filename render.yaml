@@ -2,6 +2,7 @@ services:
   - type: web
     name: sakhi-api
     runtime: python
+    rootDir: sakhi-backend
     region: singapore   # closest to India
     plan: free
     buildCommand: pip install -r requirements.txt
