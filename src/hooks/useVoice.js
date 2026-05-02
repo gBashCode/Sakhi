@@ -4,12 +4,13 @@ import { speakRegional, speakToAsha } from '@/agents/ttsAgent';
 import { parseMedical } from '@/agents/nerAgent';
 import { triageRisk } from '@/agents/riskAgent';
 import { getNextAction } from '@/agents/copilotAgent';
+import { generateAllDocuments } from '@/agents/documentAgent';
+
 
 export function useVoice(patient, language = 'hi-IN') {
   const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
+  const [documents, setDocuments] = useState(null);
 
   useEffect(() => {
     // Request mic permission on app start
@@ -20,6 +21,15 @@ export function useVoice(patient, language = 'hi-IN') {
       })
       .catch(() => alert('Mic permission dena zaroori hai. Settings se allow karein.'));
   }, []);
+
+  const downloadBlob = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const start = async () => {
     if (!permissionGranted) {
@@ -35,6 +45,7 @@ export function useVoice(patient, language = 'hi-IN') {
     setRecording(true);
     setLoading(true);
     setResult(null);
+    setDocuments(null);
 
     speakRegional('Boliye', language);
 
@@ -54,7 +65,15 @@ export function useVoice(patient, language = 'hi-IN') {
       const risk = triageRisk({...medical, age: patient?.age});
       const action = getNextAction(patient, null, risk, language === 'hi-IN' ? 'hi' : 'kn');
 
-      setResult({text, medical, risk, action});
+      const resultData = {text, medical, risk, action};
+      setResult(resultData);
+
+      // GENERATE ALL DOCUMENTS INSTANTLY
+      const docs = generateAllDocuments(patient || {}, medical, risk, action);
+      setDocuments(docs);
+
+      // Auto-save to phone (optional, but requested)
+      // downloadBlob(docs.ancCardPDF, `ANC_${medical.patient_name || 'Patient'}.pdf`);
 
       if (risk.level === 'high') {
         speakToAsha(medical.patient_name, `Khatra hai. ${action}`, language);
@@ -75,5 +94,5 @@ export function useVoice(patient, language = 'hi-IN') {
     setLoading(false);
   };
 
-  return {recording, start, stop, result, loading};
+  return {recording, start, stop, result, loading, documents, downloadBlob};
 }

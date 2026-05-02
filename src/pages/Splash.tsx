@@ -117,6 +117,18 @@ export default function Splash() {
               <p className="text-center text-xs text-muted-foreground mt-6">
                 📶 WiFi pe download karo. Baad mein 100% offline kaam karega.
               </p>
+
+              {/* Error handling */}
+              {statusText.includes("failed") && (
+                <div className="mt-4 flex gap-2">
+                  <button onClick={startDownload} className="flex-1 bg-primary text-white py-3 rounded-2xl font-bold">
+                    Retry
+                  </button>
+                  <button onClick={() => nav("/language")} className="flex-1 bg-secondary text-foreground py-3 rounded-2xl font-bold">
+                    Skip
+                  </button>
+                </div>
+              )}
             </motion.div>
           )}
 

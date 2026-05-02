@@ -1,7 +1,8 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
+
 import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
 import { useVoice } from "@/hooks/useVoice";
@@ -60,7 +61,8 @@ export default function VisitForm() {
   }, []);
 
   // ── useVoice hook (STT -> NER -> Risk -> Copilot) ─────────────────────────
-  const { recording, start, stop, result, loading: aiLoading, error: aiError } = useVoice(patient, lang);
+  const { recording, start, stop, result, loading: aiLoading, error: aiError, documents, downloadBlob } = useVoice(patient, lang);
+
 
   useEffect(() => {
     if (result?.medical) {
@@ -304,6 +306,35 @@ export default function VisitForm() {
             }`}>
               {salah}
             </p>
+
+            {/* DOWNLOAD DOCUMENTS BUTTONS */}
+            {documents && (
+              <div className="mt-4 pt-4 border-t border-dashed border-primary/20 space-y-2">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Generated Documents</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => downloadBlob(documents.ancCardPDF, `ANC_Card_${patient?.name || 'Patient'}.pdf`)}
+                    className="flex items-center gap-2 bg-white border border-primary/20 px-3 py-2 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95 transition-transform"
+                  >
+                    <Download className="w-3.5 h-3.5" /> ANC Card (PDF)
+                  </button>
+                  <button
+                    onClick={() => downloadBlob(documents.registerExcel, `Register_${patient?.name || 'Patient'}.xlsx`)}
+                    className="flex items-center gap-2 bg-white border border-primary/20 px-3 py-2 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95 transition-transform"
+                  >
+                    <Download className="w-3.5 h-3.5" /> RCH Register (XLS)
+                  </button>
+                  {documents.referralSlipPDF && (
+                    <button
+                      onClick={() => downloadBlob(documents.referralSlipPDF, `Referral_Slip_${patient?.name || 'Patient'}.pdf`)}
+                      className="flex items-center gap-2 bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-xl text-xs font-bold text-destructive shadow-sm active:scale-95 transition-transform"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Referral Slip (PDF)
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
