@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, AlertTriangle, Save, Pencil, User, Calendar, Activity, Baby } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ArrowLeft, Sparkles, AlertTriangle, Save, Pencil, User, Calendar, Activity, Baby, Syringe, ClipboardList, Home } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore, type Patient } from "@/lib/store";
 import { toast } from "sonner";
@@ -20,10 +20,18 @@ export default function VoiceEntry() {
   const t = useT();
   const nav = useNavigate();
   const addPatient = useStore((s) => s.addPatient);
+  const isDemo = useStore((s) => s.isDemo);
+  const [searchParams] = useSearchParams();
+  
+  const formType = searchParams.get("type") || "maternal";
+  const formTitle = searchParams.get("title") || t.newVisit;
+
   const [phase, setPhase] = useState<Phase>("idle");
   const [patient, setPatient] = useState<Patient | null>(null);
   const [transcript, setTranscript] = useState("");
   const [loading, setLoading] = useState(false);
+  const [extractedFields, setExtractedFields] = useState<{icon: any, label: string, value: string}[]>([]);
+  const [demoRecording, setDemoRecording] = useState(false);
 
   const handleVoiceComplete = async (blob: Blob) => {
     setPhase("processing");
@@ -57,6 +65,11 @@ export default function VoiceEntry() {
       };
 
       setPatient(newPatient);
+      setExtractedFields([
+        { icon: User, label: "Name", value: medical.name || "Unknown" },
+        { icon: Activity, label: "Symptoms", value: medical.symptoms.join(", ") || "None" },
+        { icon: AlertTriangle, label: "Risk Level", value: riskCalc.level }
+      ]);
       setPhase("result");
     } catch (err) {
       console.error("[VoiceEntry] AI Pipeline failed:", err);
@@ -67,15 +80,105 @@ export default function VoiceEntry() {
     }
   };
 
-  const { recording, start, stop } = useVoice(handleVoiceComplete);
+  const { recording: realRecording, start: realStart, stop: realStop } = useVoice(handleVoiceComplete);
+  const isRecording = isDemo ? demoRecording : realRecording;
 
   const startListening = () => {
     setPhase("listening");
-    start();
+    if (isDemo) {
+      setDemoRecording(true);
+    } else {
+      realStart();
+    }
+  };
+
+  const getMockData = (type: string) => {
+    const baseFields = { id: `p_${Date.now()}`, createdAt: Date.now(), lastVisit: Date.now(), synced: false };
+    
+    switch(type) {
+      case "demographic":
+        return {
+          text: "Ramesh Kumar ka parivar, SC category, BPL card hai, 5 sadasya hain.",
+          patient: { ...baseFields, name: "Ramesh Kumar (Household)", age: "45", symptoms: "Household: 5 members, BPL, SC Category", risk: "low" as const, recommendation: "Ensure all members are registered for Ayushman Bharat" },
+          fields: [
+            { icon: User, label: "Head of Family", value: "Ramesh Kumar" },
+            { icon: Activity, label: "Status", value: "BPL, SC" },
+            { icon: Home, label: "Members", value: "5" }
+          ]
+        };
+      case "child":
+        return {
+          text: "Rahul, 6 mahine ka, polio drop de di gayi hai, weight 6 kg.",
+          patient: { ...baseFields, name: "Rahul", age: "0.5", symptoms: "Healthy, Weight: 6kg", risk: "low" as const, vaccination: "Polio drop given", recommendation: "Next vaccination (Measles) due at 9 months." },
+          fields: [
+            { icon: Baby, label: "Child Name", value: "Rahul (6 months)" },
+            { icon: Syringe, label: "Immunization", value: "Polio OPV" },
+            { icon: Activity, label: "Weight", value: "6.0 kg" }
+          ]
+        };
+      case "disease":
+        return {
+          text: "Suresh ko 3 din se tez bukhar hai aur thodi khansi bhi hai.",
+          patient: { ...baseFields, name: "Suresh", age: "34", symptoms: "High fever for 3 days, mild cough", risk: "medium" as const, recommendation: "Provide Paracetamol. If fever persists >5 days, refer for Malaria/Dengue test." },
+          fields: [
+            { icon: User, label: "Patient", value: "Suresh" },
+            { icon: Activity, label: "Symptoms", value: "Fever (3 days), Cough" },
+            { icon: AlertTriangle, label: "Suspected", value: "Viral / Malaria" }
+          ]
+        };
+      case "ncd":
+        return {
+          text: "Kamla, BP 150 by 95, unko dawai lene ke liye bola hai.",
+          patient: { ...baseFields, name: "Kamla", age: "55", symptoms: "Hypertension screening: BP 150/95", risk: "medium" as const, recommendation: "Hypertension detected. Start lifestyle counseling, schedule NCD clinic visit." },
+          fields: [
+            { icon: User, label: "Patient", value: "Kamla" },
+            { icon: Activity, label: "Screening", value: "BP: 150/95" },
+            { icon: AlertTriangle, label: "Diagnosis", value: "Hypertension Alert" }
+          ]
+        };
+      case "family_planning":
+        return {
+          text: "Geeta, 2 bacche hain, unko Copper-T ke baare mein samjhaya.",
+          patient: { ...baseFields, name: "Geeta", age: "28", symptoms: "Family Planning Counseling: Copper-T discussed", risk: "low" as const, recommendation: "Follow up in 1 month to confirm Copper-T insertion at PHC." },
+          fields: [
+            { icon: User, label: "Target Client", value: "Geeta" },
+            { icon: Baby, label: "Living Children", value: "2" },
+            { icon: ClipboardList, label: "Method", value: "Copper-T (IUCD)" }
+          ]
+        };
+      case "maternal":
+      default:
+        return {
+          text: "Lakshmi, 7 months pregnant, pair mein sujan, BP 145 by 92",
+          patient: { 
+            ...baseFields, name: "Lakshmi", age: "27", pregnancyMonth: "7", pregnancyWeek: 30, village: "Mandya", lmp: "2025-10-01", edd: "2026-07-08", symptoms: "Swelling in legs, BP 145/92", risk: "high" as const, recommendation: "High-risk pregnancy detected. Refer to nearest PHC within 24 hours.",
+            dueItems: [{ type: "followup" as const, label: "High-risk follow-up", dueDate: Date.now() }],
+          },
+          fields: [
+            { icon: User, label: "Name", value: "Lakshmi" },
+            { icon: Calendar, label: "Pregnancy", value: "7 Months" },
+            { icon: Activity, label: "Symptoms", value: "Leg Swelling, BP 145/92" }
+          ]
+        };
+    }
   };
 
   const stopListening = () => {
-    stop();
+    if (isDemo) {
+      setDemoRecording(false);
+      setPhase("processing");
+      
+      const mockData = getMockData(formType);
+      
+      setTranscript(mockData.text);
+      setTimeout(() => {
+        setPatient(mockData.patient as Patient);
+        setExtractedFields(mockData.fields);
+        setPhase("result");
+      }, 1600);
+    } else {
+      realStop();
+    }
   };
 
   const save = () => {
@@ -91,13 +194,13 @@ export default function VoiceEntry() {
 
   return (
     <div className="min-h-screen pb-32 px-5 pt-6 pattern-organic relative">
-      <button onClick={() => nav(-1)} className="w-11 h-11 rounded-2xl glass-card flex items-center justify-center min-tap">
+      <button onClick={() => nav(-1)} className="w-11 h-11 rounded-2xl glass-card flex items-center justify-center min-tap shadow-sm">
         <ArrowLeft className="w-5 h-5 text-primary" />
       </button>
 
       <div className="mt-6 text-center">
-        <h1 className="text-3xl font-display text-primary">{t.newVisit}</h1>
-        <p className="text-muted-foreground text-sm mt-1">{t.speakNow}</p>
+        <h1 className="text-3xl font-display text-primary">{formTitle}</h1>
+        <p className="text-muted-foreground text-sm mt-1">Speak details to record</p>
       </div>
 
       {/* Mic area */}
@@ -105,7 +208,7 @@ export default function VoiceEntry() {
         <AnimatePresence mode="wait">
           {phase !== "result" && (
             <motion.div key="mic" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }}>
-              <MicButton recording={recording} onStart={startListening} onStop={stopListening} size={160} />
+              <MicButton recording={isRecording} onStart={startListening} onStop={stopListening} size={160} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -126,7 +229,7 @@ export default function VoiceEntry() {
         <div className="h-12 mt-4 flex items-center justify-center">
           {phase === "processing" && (
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-accent font-bold text-lg">
-              <Sparkles className="inline w-5 h-5 mr-1" /> AI analyzing...
+              <Sparkles className="inline w-5 h-5 mr-1" /> AI extracting {formType} data...
             </motion.p>
           )}
         </div>
@@ -154,10 +257,10 @@ export default function VoiceEntry() {
               </button>
             </div>
             <motion.div initial="hidden" animate="show" variants={{ show: { transition: { staggerChildren: 0.07 } } }} className="space-y-3">
-              <Field icon={User} label={t.name} value={patient.name} />
-              <Field icon={Calendar} label={t.age} value={`${patient.age} years`} />
-              {patient.pregnancyMonth && <Field icon={Baby} label={t.pregnancy} value={`${patient.pregnancyMonth} ${t.months}`} />}
-              <Field icon={Activity} label={t.symptoms} value={patient.symptoms} />
+              
+              {extractedFields.map((field, idx) => (
+                <Field key={idx} icon={field.icon} label={field.label} value={field.value} />
+              ))}
 
               {/* AI Recommendation */}
               <motion.div variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
@@ -192,7 +295,7 @@ export default function VoiceEntry() {
 
               <motion.button variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
                 whileTap={{ scale: 0.97 }} onClick={save}
-                className="w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 min-tap">
+                className="w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic flex items-center justify-center gap-2 min-tap mt-4">
                 <Save className="w-5 h-5" /> {t.save}
               </motion.button>
             </motion.div>
@@ -206,12 +309,12 @@ export default function VoiceEntry() {
 function Field({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
     <motion.div variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }} className="glass-card p-4 flex items-center gap-3">
-      <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+      <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 shadow-sm border border-primary/20">
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
-        <div className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">{label}</div>
-        <div className="font-bold text-foreground truncate">{value}</div>
+        <div className="text-[11px] uppercase tracking-wider font-bold text-slate-500">{label}</div>
+        <div className="font-bold text-slate-800 truncate">{value}</div>
       </div>
     </motion.div>
   );

@@ -7,6 +7,7 @@ import Splash from "./pages/Splash";
 import LanguageSelect from "./pages/LanguageSelect";
 import Login from "./pages/Login";
 import SignUp from "./pages/SignUp";
+import FormSelection from "./pages/FormSelection";
 import Home from "./pages/Home";
 import VoiceEntry from "./pages/VoiceEntry";
 import Alerts from "./pages/Alerts";
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/language" element={<LanguageSelect />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<SignUp />} />
+            <Route path="/forms" element={<FormSelection />} />
             <Route path="/home" element={<Home />} />
             <Route path="/voice" element={<VoiceEntry />} />
             <Route path="/patients" element={<Patients />} />
