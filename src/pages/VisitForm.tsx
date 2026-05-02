@@ -141,7 +141,19 @@ export default function VisitForm() {
     }
   }, [bpSys, bpDia, weight, symptoms, patientId, updatePatient, nav, t.saved]);
 
-  const gc = (f: string) => (glowField === f ? "animate-glow-field field-glow" : "");
+  const gc = (f: string) => (glowField === f ? "ring-2 ring-primary ring-offset-2 animate-pulse" : "");
+
+  const AISparkle = ({ show }: { show: boolean }) => (
+    show ? (
+      <motion.div 
+        initial={{ scale: 0, opacity: 0 }} 
+        animate={{ scale: 1, opacity: 1 }} 
+        className="flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-tighter"
+      >
+        <Sparkles className="w-2.5 h-2.5" /> AI Filled
+      </motion.div>
+    ) : null
+  );
 
   return (
     <div className="min-h-screen pb-32 px-5 pt-6 pattern-organic">
@@ -368,10 +380,12 @@ export default function VisitForm() {
           </motion.div>
         )}
 
-        {/* BP row */}
         <div className="flex gap-3">
           <div className="flex-1">
-            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.bpSystolic}</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-muted-foreground block">{t.bpSystolic}</label>
+              <AISparkle show={!!bpSys && !!result} />
+            </div>
             <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("bp")}`}>
               <Heart className="w-4 h-4 text-destructive shrink-0" />
               {/* data-field required for QA */}
@@ -387,7 +401,10 @@ export default function VisitForm() {
             </div>
           </div>
           <div className="flex-1">
-            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.bpDiastolic}</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-muted-foreground block">{t.bpDiastolic}</label>
+              <AISparkle show={!!bpDia && !!result} />
+            </div>
             <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("bp")}`}>
               <Heart className="w-4 h-4 text-accent shrink-0" />
               {/* data-field required for QA */}
@@ -406,7 +423,10 @@ export default function VisitForm() {
 
         {/* Weight */}
         <div>
-          <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.weight}</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-muted-foreground block">{t.weight}</label>
+            <AISparkle show={!!weight && !!result} />
+          </div>
           <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("weight")}`}>
             <Activity className="w-4 h-4 text-primary shrink-0" />
             <input
@@ -424,7 +444,10 @@ export default function VisitForm() {
 
         {/* Symptoms */}
         <div>
-          <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.symptoms}</label>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-bold text-muted-foreground block">{t.symptoms}</label>
+            <AISparkle show={!!symptoms && !!result} />
+          </div>
           <div className={`bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("symptoms")}`}>
             <textarea
               data-field="symptoms"
