@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, Save, User, Calendar, Activity, Volume2, Mic, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
 
 import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
@@ -141,19 +141,7 @@ export default function VisitForm() {
     }
   }, [bpSys, bpDia, weight, symptoms, patientId, updatePatient, nav, t.saved]);
 
-  const gc = (f: string) => (glowField === f ? "ring-2 ring-primary ring-offset-2 animate-pulse" : "");
-
-  const AISparkle = ({ show }: { show: boolean }) => (
-    show ? (
-      <motion.div 
-        initial={{ scale: 0, opacity: 0 }} 
-        animate={{ scale: 1, opacity: 1 }} 
-        className="flex items-center gap-1 text-[9px] font-bold text-primary uppercase tracking-tighter"
-      >
-        <Sparkles className="w-2.5 h-2.5" /> AI Filled
-      </motion.div>
-    ) : null
-  );
+  const gc = (f: string) => (glowField === f ? "animate-glow-field field-glow" : "");
 
   return (
     <div className="min-h-screen pb-32 px-5 pt-6 pattern-organic">
@@ -219,36 +207,6 @@ export default function VisitForm() {
           </div>
         )}
         {transcript && <div className="w-full mt-2"><VoiceTranscript text={transcript} /></div>}
-        
-        {/* FALLBACK: KEYBOARD VOICE TYPING */}
-        <div className="mt-4 text-center">
-          <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Problem with AI? Use Phone Mic:</p>
-          <button
-            onClick={() => {
-              const input = document.getElementById('keyboard-fallback-form') as HTMLTextAreaElement;
-              input.focus();
-            }}
-            className="bg-secondary/50 border border-border px-4 py-2 rounded-2xl text-xs font-bold text-foreground flex items-center gap-2 mx-auto"
-          >
-            <Mic className="w-3 h-3" /> Tap to use Keyboard Mic
-          </button>
-          <textarea
-            id="keyboard-fallback-form"
-            className="opacity-0 h-0 w-0 absolute overflow-hidden"
-            placeholder="Talk to your keyboard mic..."
-            onChange={(e) => setTranscript(e.target.value)}
-            onBlur={() => {
-              if (transcript) {
-                // useVoice process logic
-                const parsed = parseMedical(transcript);
-                if (parsed.bp_sys) setBpSys(String(parsed.bp_sys));
-                if (parsed.bp_dia) setBpDia(String(parsed.bp_dia));
-                if (parsed.weight_kg) setWeight(String(parsed.weight_kg));
-                if (parsed.symptoms?.length) setSymptoms(parsed.symptoms.join(", "));
-              }
-            }}
-          />
-        </div>
       </div>
 
       {/* ── Anemia Check (camera pallor screening) ───────────────────── */}
@@ -380,12 +338,10 @@ export default function VisitForm() {
           </motion.div>
         )}
 
+        {/* BP row */}
         <div className="flex gap-3">
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-muted-foreground block">{t.bpSystolic}</label>
-              <AISparkle show={!!bpSys && !!result} />
-            </div>
+            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.bpSystolic}</label>
             <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("bp")}`}>
               <Heart className="w-4 h-4 text-destructive shrink-0" />
               {/* data-field required for QA */}
@@ -401,10 +357,7 @@ export default function VisitForm() {
             </div>
           </div>
           <div className="flex-1">
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-muted-foreground block">{t.bpDiastolic}</label>
-              <AISparkle show={!!bpDia && !!result} />
-            </div>
+            <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.bpDiastolic}</label>
             <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("bp")}`}>
               <Heart className="w-4 h-4 text-accent shrink-0" />
               {/* data-field required for QA */}
@@ -423,10 +376,7 @@ export default function VisitForm() {
 
         {/* Weight */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-bold text-muted-foreground block">{t.weight}</label>
-            <AISparkle show={!!weight && !!result} />
-          </div>
+          <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.weight}</label>
           <div className={`flex items-center gap-2 bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("weight")}`}>
             <Activity className="w-4 h-4 text-primary shrink-0" />
             <input
@@ -444,10 +394,7 @@ export default function VisitForm() {
 
         {/* Symptoms */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-bold text-muted-foreground block">{t.symptoms}</label>
-            <AISparkle show={!!symptoms && !!result} />
-          </div>
+          <label className="text-xs font-bold text-muted-foreground mb-1.5 block">{t.symptoms}</label>
           <div className={`bg-card/60 rounded-2xl px-4 py-3.5 border border-border transition-all ${gc("symptoms")}`}>
             <textarea
               data-field="symptoms"

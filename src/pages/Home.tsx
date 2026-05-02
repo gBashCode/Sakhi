@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mic, Bell, AlertTriangle, CloudUpload, Users, Syringe,
-  ShieldAlert, CalendarClock, Download, CheckCircle2, FileText
+  ShieldAlert, CalendarClock, Download, CheckCircle2
 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
@@ -125,24 +125,6 @@ export default function Home() {
         <QuickCard icon={Bell} title={t.followUps} value={`4 ${t.pending}`} tint="accent" onClick={() => nav("/alerts")} delay={0.36} />
         <QuickCard icon={AlertTriangle} title={t.highRisk} value={`${highRisk} ${t.pending}`} tint="destructive" onClick={() => nav("/alerts")} delay={0.4} />
         <QuickCard icon={CloudUpload} title={t.sync} value={`${pending} ${t.pending}`} tint="primary" onClick={() => nav("/sync")} delay={0.44} full />
-      </div>
-
-      {/* Learning Resources / Guidelines */}
-      <div className="mt-6">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">Guidelines & Resources</h3>
-        <button 
-          onClick={() => toast.info("ANC Guidelines PDF opening...")}
-          className="w-full glass-card p-4 flex items-center gap-4 active:scale-[0.98] transition-transform"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-            <FileText className="w-6 h-6" />
-          </div>
-          <div className="flex-1 text-left">
-            <div className="font-bold text-sm">MoHFW ANC Guidelines 2024</div>
-            <div className="text-xs text-muted-foreground">Official Clinical Reference (PDF)</div>
-          </div>
-          <Download className="w-5 h-5 text-muted-foreground" />
-        </button>
       </div>
 
       {/* CalmOps action card */}

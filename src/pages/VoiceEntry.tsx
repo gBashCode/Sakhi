@@ -12,8 +12,7 @@ import { parseMedical } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
 import { getNextAction } from "@/agents/copilotAgent";
 import { generateAllDocuments } from "@/agents/documentAgent";
-import { saveToPhone } from "@/lib/filesystem";
-import { Download, Share2, FileText } from "lucide-react";
+import { Download, FileText, Share2 } from "lucide-react";
 
 
 type Phase = "idle" | "speaking" | "listening" | "processing" | "result";
@@ -142,11 +141,21 @@ export default function VoiceEntry() {
 
     setFinalPatient(newPatient);
     
-    // GENERATE DOCUMENTS
+    // Generate docs
     const generatedDocs = generateAllDocuments({}, md, risk, action);
     setDocs(generatedDocs);
 
     setPhase("result");
+  };
+
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const startFlow = () => {
@@ -251,36 +260,6 @@ export default function VoiceEntry() {
                 <VoiceTranscript text={transcript} />
               </div>
             )}
-
-            {/* FALLBACK: KEYBOARD VOICE TYPING */}
-            <div className="mt-4 text-center">
-              <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Problem with AI? Use Phone Mic:</p>
-              <button
-                onClick={() => {
-                  const input = document.getElementById('keyboard-fallback') as HTMLTextAreaElement;
-                  input.focus();
-                }}
-                className="bg-secondary/50 border border-border px-4 py-2 rounded-2xl text-xs font-bold text-foreground flex items-center gap-2 mx-auto"
-              >
-                <Mic className="w-3 h-3" /> Tap to use Keyboard Mic
-              </button>
-              <textarea
-                id="keyboard-fallback"
-                className="opacity-0 h-0 w-0 absolute overflow-hidden"
-                placeholder="Talk to your keyboard mic..."
-                onChange={(e) => {
-                  setTranscript(e.target.value);
-                  // Auto-submit after 2s of no typing
-                }}
-                onBlur={() => {
-                  if (transcript) {
-                    const parsed = parseMedical(transcript);
-                    setMedicalData((prev: any) => ({ ...prev, ...filterByField(parsed, QUESTIONS[qIndex].field) }));
-                    setTimeout(() => setQIndex(prev => prev + 1), 500);
-                  }
-                }}
-              />
-            </div>
           </div>
         )}
 
@@ -324,14 +303,14 @@ export default function VoiceEntry() {
                     
                     <div className="flex flex-wrap gap-2">
                       <button
-                        onClick={() => saveToPhone(docs.ancCardPDF, `ANC_Card_${finalPatient.name}.pdf`)}
+                        onClick={() => downloadBlob(docs.ancCardPDF, `ANC_Card_${finalPatient.name}.pdf`)}
                         className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-primary/20 py-3 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95"
                       >
                         <Download className="w-3.5 h-3.5" /> ANC Card
                       </button>
                       
                       <button
-                        onClick={() => saveToPhone(docs.registerExcel, `Register_${finalPatient.name}.xlsx`)}
+                        onClick={() => downloadBlob(docs.registerExcel, `Register_${finalPatient.name}.xlsx`)}
                         className="flex-1 min-w-[140px] flex items-center justify-center gap-2 bg-white border border-primary/20 py-3 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95"
                       >
                         <Download className="w-3.5 h-3.5" /> Register (XLS)
@@ -340,25 +319,17 @@ export default function VoiceEntry() {
                       {docs.referralSlipPDF && (
                         <div className="w-full flex gap-2">
                           <button
-                            onClick={() => saveToPhone(docs.referralSlipPDF, `Referral_${finalPatient.name}.pdf`)}
+                            onClick={() => downloadBlob(docs.referralSlipPDF, `Referral_${finalPatient.name}.pdf`)}
                             className="flex-1 flex items-center justify-center gap-2 bg-destructive/10 border border-destructive/20 py-3 rounded-xl text-xs font-bold text-destructive shadow-sm active:scale-95"
                           >
                             <Download className="w-3.5 h-3.5" /> Referral Slip
-                          </button>
-                          <button
-                            onClick={() => {
-                              const sms = `tel:?body=${encodeURIComponent(docs.smsText)}`;
-                              window.location.href = `sms:?body=${encodeURIComponent(docs.smsText)}`;
-                            }}
-                            className="w-12 flex items-center justify-center bg-primary text-white rounded-xl shadow-sm active:scale-95"
-                          >
-                            <Share2 className="w-4 h-4" />
                           </button>
                         </div>
                       )}
                     </div>
                   </div>
                 )}
+
 
                 <button onClick={save}
                   className="w-full bg-primary text-white py-5 rounded-3xl font-bold text-lg shadow-xl flex items-center justify-center gap-2">
