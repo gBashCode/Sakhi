@@ -17,7 +17,7 @@ export default function BottomNav() {
     { to: "/profile", icon: User, label: t.profile },
   ];
 
-  const hiddenPaths = ["/", "/language", "/login", "/splash", "/high-risk-alert"];
+  const hiddenPaths = ["/", "/language", "/login", "/signup", "/splash", "/high-risk-alert"];
   if (hiddenPaths.includes(pathname)) return null;
 
   return (

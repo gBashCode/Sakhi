@@ -2,7 +2,7 @@ export type Lang = "en" | "hi" | "kn";
 
 export const translations = {
   en: {
-    appName: "SevaSaathi AI",
+    appName: "Sakhi AI",
     tagline: "Your AI healthcare companion",
     chooseLanguage: "Choose your language",
     continue: "Continue",

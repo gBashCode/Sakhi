@@ -32,7 +32,7 @@ export default function Splash() {
         <div className="w-32 h-32 flex items-center justify-center bg-white rounded-full shadow-xl border border-slate-100 p-2">
           <img src="/logo.png" alt="Sakhi Logo" className="w-full h-full object-contain drop-shadow-md" />
         </div>
-        <h1 className="mt-8 text-5xl font-display text-primary">SevaSaathi</h1>
+        <h1 className="mt-8 text-5xl font-display text-primary">Sakhi</h1>
         <p className="text-accent font-semibold tracking-widest text-sm mt-1 uppercase">AI Healthcare</p>
       </motion.div>
 

@@ -2,13 +2,18 @@ import { motion } from "framer-motion";
 import { WifiOff } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useState, useEffect } from "react";
+import { useStore } from "@/lib/store";
 
 export default function OfflineBanner() {
   const t = useT();
   const [online, setOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const up = () => setOnline(true);
+    const up = () => {
+      setOnline(true);
+      // Automatically trigger sync when back online
+      useStore.getState().syncAll();
+    };
     const down = () => setOnline(false);
     window.addEventListener("online", up);
     window.addEventListener("offline", down);

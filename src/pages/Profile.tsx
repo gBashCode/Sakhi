@@ -7,7 +7,7 @@ import { useStore } from "@/lib/store";
 export default function Profile() {
   const t = useT();
   const nav = useNavigate();
-  const { setLoggedIn, patients } = useStore();
+  const { setLoggedIn, patients, userName } = useStore();
 
   const items = [
     { icon: Globe, label: t.language, value: t.change, onClick: () => nav("/language") },
@@ -30,7 +30,7 @@ export default function Profile() {
         <div className="w-20 h-20 rounded-3xl bg-gradient-primary mx-auto flex items-center justify-center shadow-mic">
           <User className="w-10 h-10 text-primary-foreground" />
         </div>
-        <div className="mt-3 text-2xl font-display text-foreground">Asha Didi</div>
+        <div className="mt-3 text-2xl font-display text-foreground">{userName} Didi</div>
         <div className="text-sm text-muted-foreground">{t.asha}</div>
       </motion.div>
 
