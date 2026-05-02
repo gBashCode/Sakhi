@@ -56,7 +56,7 @@ export default function Home() {
       <motion.button
         initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
         whileTap={{ scale: 0.98 }}
-        onClick={() => nav("/voice")}
+        onClick={() => nav("/forms")}
         className="mt-4 w-full relative overflow-hidden rounded-3xl bg-gradient-primary p-6 text-left shadow-mic"
       >
         <div className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full bg-primary-glow/40 blur-3xl" />

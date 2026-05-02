@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Sparkles, AlertTriangle, Save, Pencil, User, Calendar, Activity, Baby } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore, type Patient } from "@/lib/store";
@@ -15,6 +15,9 @@ export default function VoiceEntry() {
   const nav = useNavigate();
   const addPatient = useStore((s) => s.addPatient);
   const isDemo = useStore((s) => s.isDemo);
+  const [searchParams] = useSearchParams();
+  const formTitle = searchParams.get("title") || t.newVisit;
+  
   const [phase, setPhase] = useState<Phase>("idle");
   const [patient, setPatient] = useState<Patient | null>(null);
   const [transcript, setTranscript] = useState("");
@@ -65,8 +68,8 @@ export default function VoiceEntry() {
       </button>
 
       <div className="mt-6 text-center">
-        <h1 className="text-3xl font-display text-primary">{t.newVisit}</h1>
-        <p className="text-muted-foreground text-sm mt-1">{t.speakNow}</p>
+        <h1 className="text-3xl font-display text-primary">{formTitle}</h1>
+        <p className="text-muted-foreground text-sm mt-1">Speak details to record</p>
       </div>
 
       {/* Mic area */}
