@@ -72,7 +72,7 @@ type Store = {
   addVisit: (v: Visit) => void;
 
   /* ── sync ── */
-  syncAll: () => void;
+  syncAll: () => Promise<void>;
   lastSyncTime: number | null;
   syncProgress: number;
   failedSyncs: number;
@@ -283,22 +283,83 @@ export const useStore = create<Store>()(
   addVisit: (v) => set((s) => ({ visits: [v, ...s.visits] })),
 
   /* sync */
-  syncAll: () =>
-    set((s) => ({
-      patients: s.patients.map((p) => ({ ...p, synced: true })),
-      visits: s.visits.map((v) => ({ ...v, synced: true })),
-      lastSyncTime: Date.now(),
-      syncProgress: 100,
-      failedSyncs: 0,
-    })),
+  syncAll: async () => {
+    const state = useStore.getState();
+    const unsyncedPatients = state.patients.filter((p) => !p.synced);
+    const unsyncedVisits = state.visits.filter((v) => !v.synced);
+
+    if (unsyncedPatients.length === 0 && unsyncedVisits.length === 0) {
+      set({ syncProgress: 100, failedSyncs: 0, lastSyncTime: Date.now() });
+      return;
+    }
+
+    set({ syncProgress: 10, failedSyncs: 0 });
+
+    try {
+      const BASE_URL = import.meta.env.VITE_API_URL || "";
+      const token = localStorage.getItem("sakhi_token");
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      // Sync patients
+      if (unsyncedPatients.length > 0) {
+        set({ syncProgress: 30 });
+        const res = await fetch(`${BASE_URL}/api/v1/sync/patients`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ patients: unsyncedPatients }),
+        });
+        if (!res.ok) throw new Error("Failed to sync patients");
+      }
+
+      // Sync visits
+      if (unsyncedVisits.length > 0) {
+        set({ syncProgress: 60 });
+        const res = await fetch(`${BASE_URL}/api/v1/sync`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            visits: unsyncedVisits.map((v) => ({
+              client_id: v.id,
+              patient_id: v.patientId,
+              bp_sys: v.bpSys,
+              bp_dia: v.bpDia,
+              weight: v.weight,
+              symptoms: v.symptoms ? [v.symptoms] : [],
+              risk_level: v.risk,
+              device_ts: new Date(v.createdAt).toISOString(),
+            }))
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to sync visits");
+      }
+
+      set((s) => {
+        const syncedPatientIds = new Set(unsyncedPatients.map((p) => p.id));
+        const syncedVisitIds = new Set(unsyncedVisits.map((v) => v.id));
+        return {
+          patients: s.patients.map((p) =>
+            syncedPatientIds.has(p.id) ? { ...p, synced: true } : p
+          ),
+          visits: s.visits.map((v) =>
+            syncedVisitIds.has(v.id) ? { ...v, synced: true } : v
+          ),
+          lastSyncTime: Date.now(),
+          syncProgress: 100,
+          failedSyncs: 0,
+        };
+      });
+    } catch (error) {
+      console.error("Sync error:", error);
+      set({ failedSyncs: 1, syncProgress: 0 });
+    }
+  },
   lastSyncTime: null,
   syncProgress: 0,
-  failedSyncs: 1,
-  retrySync: () =>
-    set((s) => {
-      // Simulate retry
-      return { failedSyncs: 0, syncProgress: 100, lastSyncTime: Date.now() };
-    }),
+  failedSyncs: 0,
+  retrySync: () => {
+    useStore.getState().syncAll();
+  },
 
   /* settings */
   settings: { voiceEnabled: true, syncOnWifiOnly: false },

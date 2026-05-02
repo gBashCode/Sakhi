@@ -29,3 +29,5 @@ temp_lovable/
 venv/
 .env
 public/models/
+
+firebase-credentials.json

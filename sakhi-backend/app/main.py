@@ -7,11 +7,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-from app.db.session import engine, Base
-from app.models.user import User
-from app.models.patient import Patient
-from app.models.visit import Visit
-Base.metadata.create_all(bind=engine)
+# Firebase/Firestore handles schemas automatically.
 
 app.add_middleware(
     CORSMiddleware,

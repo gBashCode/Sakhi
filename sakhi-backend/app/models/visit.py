@@ -1,20 +1,17 @@
-import uuid
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, Enum, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID
-from app.db.session import Base
 
-class Visit(Base):
-    __tablename__ = "visits"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    client_id = Column(UUID(as_uuid=True), unique=True) # from phone
-    patient_id = Column(UUID(as_uuid=True), ForeignKey('patients.id'))
-    asha_id = Column(UUID(as_uuid=True), ForeignKey('users.id'))
-    bp_sys = Column(Integer, nullable=True)
-    bp_dia = Column(Integer, nullable=True)
-    weight = Column(Float, nullable=True)
-    symptoms = Column(JSON, default=[])
-    risk_level = Column(Enum('low','medium','high', name='risk_level'), default='low')
-    device_ts = Column(DateTime, nullable=False)
-    server_ts = Column(DateTime, default=datetime.utcnow)
-    synced = Column(Boolean, default=True)
+class Visit(BaseModel):
+    id: str
+    client_id: Optional[str] = None
+    patient_id: Optional[str] = None
+    asha_id: Optional[str] = None
+    bp_sys: Optional[int] = None
+    bp_dia: Optional[int] = None
+    weight: Optional[float] = None
+    symptoms: List[str] = Field(default_factory=list)
+    risk_level: str = 'low'
+    device_ts: datetime
+    server_ts: datetime = Field(default_factory=datetime.utcnow)
+    synced: bool = True

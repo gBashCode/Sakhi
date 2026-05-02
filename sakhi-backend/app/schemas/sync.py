@@ -3,8 +3,8 @@ from datetime import datetime
 from typing import List, Optional
 
 class VisitSyncIn(BaseModel):
-    client_id: UUID4
-    patient_id: UUID4
+    client_id: str
+    patient_id: str
     bp_sys: Optional[int] = None
     bp_dia: Optional[int] = None
     weight: Optional[float] = None

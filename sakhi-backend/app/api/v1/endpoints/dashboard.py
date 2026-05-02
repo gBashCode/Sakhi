@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from app.api.deps import get_current_user
-from sqlalchemy.orm import Session
-from app.db.session import get_db
 from app.core.config import settings
 from app.core.redis_client import r
 
@@ -18,7 +16,7 @@ def get_alerts(current_user = Depends(get_current_user)):
         return {"alerts": ["High risk alert system temporarily offline. Please check PHC register."]}
 
 @router.get("/patients/due")
-def get_due_patients(current_user = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_due_patients(current_user = Depends(get_current_user)):
     # For hackathon: return mock
     return [
         {"id":"123","name":"Sunita","due_date":"2026-05-05","due_for":"ANC-2"},
