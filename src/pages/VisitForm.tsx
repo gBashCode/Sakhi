@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { parseMedical, calcRisk as nerCalcRisk } from "@/agents/nerAgent";
 import { triageRisk } from "@/agents/riskAgent";
 import { getNextAction } from "@/agents/copilotAgent";
+import { transcribeOnDevice } from "@/agents/sttAgent";
 import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
@@ -48,8 +49,45 @@ export default function VisitForm() {
     risk: string; score: number; confidence: string; detail: string;
   } | null>(null);
 
-  // ── useVoice hook (real Whisper transcription) ────────────────────────────
-  const { recording, transcribing, transcript, start, stop } = useVoice();
+  const [loading, setLoading] = useState(false);
+  const [transcript, setTranscript] = useState("");
+
+  const handleVoiceComplete = async (blob: Blob) => {
+    setLoading(true);
+    try {
+      // Agent 1: Speech-to-Text
+      const text = await transcribeOnDevice(blob);
+      setTranscript(text);
+      
+      // Agent 2: NLP / NER Parser
+      const medical = parseMedical(text);
+      if (medical.bp_sys) { setBpSys(String(medical.bp_sys)); setGlowField("bp"); }
+      if (medical.bp_dia) setBpDia(String(medical.bp_dia));
+      if (medical.weight_kg) { setWeight(String(medical.weight_kg)); setGlowField("weight"); }
+      if (medical.symptoms.length) {
+         setSymptoms(medical.symptoms.join(", "));
+         setGlowField("symptoms");
+      }
+
+      // Agent 3: Clinical Triage
+      const age = patient?.age ? parseInt(patient.age) : null;
+      const riskCalc = triageRisk({ ...medical, age });
+      setRisk(riskCalc.level as Risk);
+      setTriage(riskCalc);
+
+      // Agent 4: CalmOps Copilot
+      const visitSnapshot = { ifaGiven: false, ttDone: false, deviceTs: Date.now() };
+      const action = getNextAction(patient ?? {}, visitSnapshot, riskCalc);
+      setSalah(action);
+    } catch (err) {
+      console.error("Pipeline failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── useVoice hook (recording only now) ────────────────────────────────────
+  const { recording, start, stop } = useVoice(handleVoiceComplete);
 
   // ── Risk + Triage + Copilot: recalculate on every form change ─────────────
   useEffect(() => {
@@ -74,23 +112,6 @@ export default function VisitForm() {
       return () => clearTimeout(t2);
     }
   }, [glowField]);
-
-  // ── Parse transcript → form fields via nerAgent ──────────────────────────
-  useEffect(() => {
-    if (!transcript) return;
-    const parsed = parseMedical(transcript);
-    if (parsed.bp_sys)    { setBpSys(String(parsed.bp_sys));  setGlowField("bp"); }
-    if (parsed.bp_dia)    setBpDia(String(parsed.bp_dia));
-    if (parsed.weight_kg) { setWeight(String(parsed.weight_kg)); setGlowField("weight"); }
-    if (parsed.symptoms.length) {
-      setSymptoms((prev) => {
-        const existing = prev ? prev.split(", ") : [];
-        const merged = [...new Set([...existing, ...parsed.symptoms])];
-        return merged.join(", ");
-      });
-      setGlowField("symptoms");
-    }
-  }, [transcript]);
 
   // ── Save to Dexie (offline-first) then Zustand store ─────────────────────
   const handleSave = useCallback(async () => {
@@ -154,8 +175,10 @@ export default function VisitForm() {
             onStop={stop}
           />
         </div>
-        {transcribing && (
-          <p className="text-xs text-accent font-semibold animate-pulse">Transcribing…</p>
+        {loading && (
+          <p className="text-xs text-accent font-semibold animate-pulse">
+            Sakhi AI soch rahi hai...
+          </p>
         )}
         {recording && (
           <div className="flex items-end justify-center gap-1 h-8">

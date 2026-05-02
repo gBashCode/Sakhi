@@ -18,7 +18,7 @@ import { transcribeOnDevice, warmUpSTT } from '@/agents/sttAgent';
 // Warm up the model as soon as this module is imported (background fetch)
 warmUpSTT();
 
-export function useVoice() {
+export function useVoice(onStopBlob) {
   const [recording, setRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -38,19 +38,9 @@ export function useVoice() {
       mr.onstop = async () => {
         // Release mic immediately
         stream.getTracks().forEach((t) => t.stop());
-
         const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-        setTranscribing(true);
-        try {
-          // ── On-device Whisper via sttAgent ──────────────────────────────
-          // Works in airplane mode after first-load cache (IndexedDB / Cache API)
-          const text = await transcribeOnDevice(blob);
-          setTranscript(text);
-        } catch (err) {
-          console.error('[useVoice] Transcription failed:', err);
-          setTranscript('');
-        } finally {
-          setTranscribing(false);
+        if (onStopBlob) {
+           onStopBlob(blob);
         }
       };
 
