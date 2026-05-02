@@ -2,8 +2,9 @@ import { pipeline, env } from '@xenova/transformers';
 
 // Configuration for offline-first operation
 env.allowLocalModels = true;
-env.allowRemoteModels = true; // Allow first-time download
-env.backends.onnx.wasm.numThreads = 1; // Save RAM for 2GB devices
+env.allowRemoteModels = typeof navigator !== 'undefined' ? navigator.onLine : true; // Prevent twitching/hanging offline
+env.localModelPath = '/models/'; // Explicit local cache path
+env.backends.onnx.wasm.numThreads = typeof navigator !== 'undefined' ? Math.max(1, (navigator.hardwareConcurrency || 4) - 1) : 4; // Maximize speed
 env.backends.onnx.wasm.wasmPaths = '/wasm/'; // Local WASM files
 
 let hfPipeline = null;
@@ -19,10 +20,10 @@ export async function initSTT(progressCallback = null) {
   modelStatus = 'loading';
   try {
     console.log('Initializing Whisper Multilingual Offline Engine...');
-    // 'Xenova/whisper-tiny' is ~40MB and supports Hindi/Kannada
+    // 'Xenova/whisper-base' is ~140MB and offers a great balance of speed and accuracy for Hindi/Kannada
     hfPipeline = await pipeline(
       'automatic-speech-recognition',
-      'Xenova/whisper-tiny', 
+      'Xenova/whisper-base', 
       {
         quantized: true,
         progress_callback: (p) => {
@@ -48,13 +49,21 @@ export function isModelReady() { return modelStatus === 'ready'; }
 /**
  * Transcribe using the on-device Whisper model
  */
+let globalAudioContext = null;
+
 export async function transcribeOnDevice(audioBlob, language = 'hindi') {
   const stt = await initSTT();
   if (!stt) throw new Error('Offline AI model not ready');
 
   const arrayBuffer = await audioBlob.arrayBuffer();
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  
+  if (!globalAudioContext) {
+    globalAudioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  } else if (globalAudioContext.state === 'suspended') {
+    await globalAudioContext.resume();
+  }
+
+  const audioBuffer = await globalAudioContext.decodeAudioData(arrayBuffer);
   const audioData = audioBuffer.getChannelData(0);
 
   const output = await stt(audioData, {
