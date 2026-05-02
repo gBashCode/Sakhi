@@ -4,38 +4,39 @@ import * as XLSX from 'xlsx';
 
 // MASTER TEMPLATE: Maps AI output → All documents
 export function generateAllDocuments(patient, medical, risk, action) {
+
   const today = new Date().toLocaleDateString('hi-IN');
-  const edd = medical.lmp_date ? calculateEDD(medical.lmp_date) : 'N/A';
+  const edd = medical.lmp_date? calculateEDD(medical.lmp_date) : 'N/A';
 
   const docData = {
     // Common fields for all docs
     name: medical.patient_name || patient.name || 'Unknown',
-    age: patient.age || medical.age || 'N/A',
+    age: patient.age || 'N/A',
     husband_name: patient.husband_name || '',
     village: patient.village || '',
-    asha_name: 'Sunita ASHA', // Hardcoded or from store
+    asha_name: 'Sunita ASHA', // From login
     date: today,
 
     // Vitals
-    bp: medical.bp_sys && medical.bp_dia ? `${medical.bp_sys}/${medical.bp_dia}` : 'N/A',
-    weight: medical.weight_kg ? `${medical.weight_kg} kg` : 'N/A',
-    lmp: medical.lmp_date || 'N/A',
+    bp: medical.bp_sys && medical.bp_dia? `${medical.bp_sys}/${medical.bp_dia}` : '',
+    weight: medical.weight_kg? `${medical.weight_kg} kg` : '',
+    lmp: medical.lmp_date || '',
     edd: edd,
 
     // Risk
     risk_level: risk.level.toUpperCase(),
-    danger_signs: (risk.flags || []).join(', ') || 'None',
+    danger_signs: risk.flags.join(', '),
     action: action,
 
     // Symptoms
-    symptoms: (medical.symptoms || []).join(', ') || 'None'
+    symptoms: (medical.symptoms || []).join(', ')
   };
 
   return {
     ancCardPDF: generateANCCardPDF(docData),
     registerExcel: generateRegisterExcel(docData),
-    referralSlipPDF: risk.level === 'high' ? generateReferralPDF(docData) : null,
-    smsText: risk.level === 'high' ? generateReferralSMS(docData) : null
+    referralSlipPDF: risk.level === 'high'? generateReferralPDF(docData) : null,
+    smsText: risk.level === 'high'? generateReferralSMS(docData) : null
   };
 }
 
@@ -45,7 +46,7 @@ function generateANCCardPDF(data) {
 
   // Header
   doc.setFontSize(16);
-  doc.text('ANC CARD - RCH Program', 105, 15, { align: 'center' });
+  doc.text('ANC CARD - RCH Program', 105, 15, {align: 'center'});
   doc.setFontSize(10);
   doc.text(`Date: ${data.date}`, 15, 25);
 
@@ -60,39 +61,35 @@ function generateANCCardPDF(data) {
   // Vitals Table
   doc.setFontSize(12);
   doc.text('VITALS - TODAY', 15, 65);
-  
-  const body = [
-    ['BP', data.bp, '< 140/90'],
-    ['Weight', data.weight, ''],
-    ['LMP', data.lmp, ''],
-    ['EDD', data.edd, ''],
-    ['Symptoms', data.symptoms, 'None']
-  ];
-
-  doc.autoTable({
+  (doc).autoTable({
     startY: 70,
     head: [['Parameter', 'Value', 'Normal']],
-    body: body,
+    body: [
+      ['BP', data.bp, '< 140/90'],
+      ['Weight', data.weight, ''],
+      ['LMP', data.lmp, ''],
+      ['EDD', data.edd, ''],
+      ['Symptoms', data.symptoms, 'None']
+    ],
     theme: 'grid'
   });
 
-  const finalY = doc.lastAutoTable.finalY;
-
   // Risk Assessment
+  const finalY = (doc).lastAutoTable.finalY;
   doc.setFontSize(12);
   doc.text('RISK ASSESSMENT', 15, finalY + 10);
   doc.setFontSize(10);
-  if (data.risk_level === 'HIGH') doc.setTextColor(255, 0, 0);
+  doc.setTextColor(data.risk_level === 'HIGH'? 255 : 0, 0, 0);
   doc.text(`Risk Level: ${data.risk_level}`, 15, finalY + 17);
   doc.setTextColor(0, 0, 0);
-  doc.text(`Danger Signs: ${data.danger_signs}`, 15, finalY + 23);
+  doc.text(`Danger Signs: ${data.danger_signs || 'None'}`, 15, finalY + 23);
   doc.text(`Action: ${data.action}`, 15, finalY + 29);
 
-  // Footer
+  // ASHA Signature
   doc.text(`ASHA Signature: ${data.asha_name}`, 15, 270);
   doc.text(`Date: ${data.date}`, 150, 270);
 
-  return doc.output('blob');
+  return doc.output('blob'); // Returns PDF blob
 }
 
 // DOCUMENT 2: RCH REGISTER EXCEL
@@ -106,17 +103,17 @@ function generateRegisterExcel(data) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'ANC Visits');
 
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  return new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const excelBuffer = XLSX.write(wb, {bookType: 'xlsx', type: 'array'});
+  return new Blob([excelBuffer], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
 }
 
-// DOCUMENT 3: REFERRAL SLIP PDF
+// DOCUMENT 3: REFERRAL SLIP PDF - Only if high risk
 function generateReferralPDF(data) {
   const doc = new jsPDF();
 
   doc.setFontSize(18);
   doc.setTextColor(255, 0, 0);
-  doc.text('URGENT REFERRAL SLIP', 105, 20, { align: 'center' });
+  doc.text('URGENT REFERRAL SLIP', 105, 20, {align: 'center'});
 
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
@@ -141,17 +138,14 @@ function generateReferralPDF(data) {
   return doc.output('blob');
 }
 
+// SMS TEXT for ANM
 function generateReferralSMS(data) {
   return `URGENT REFERRAL: ${data.name}, ${data.age}y, ${data.village}. BP ${data.bp}. ${data.danger_signs}. ASHA ${data.asha_name} referring to PHC now. ${data.date}`;
 }
 
+// Helper: Calculate EDD from LMP
 function calculateEDD(lmpDate) {
-  try {
-    const lmp = new Date(lmpDate);
-    if (isNaN(lmp.getTime())) return 'N/A';
-    lmp.setDate(lmp.getDate() + 280); // 40 weeks
-    return lmp.toLocaleDateString('hi-IN');
-  } catch (e) {
-    return 'N/A';
-  }
+  const lmp = new Date(lmpDate);
+  lmp.setDate(lmp.getDate() + 280); // 40 weeks
+  return lmp.toLocaleDateString('hi-IN');
 }

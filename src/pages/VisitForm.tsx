@@ -1,8 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
-
+import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
 import { useVoice } from "@/hooks/useVoice";
@@ -61,8 +60,7 @@ export default function VisitForm() {
   }, []);
 
   // ── useVoice hook (STT -> NER -> Risk -> Copilot) ─────────────────────────
-  const { recording, start, stop, result, loading: aiLoading, error: aiError, documents, downloadBlob } = useVoice(patient, lang);
-
+  const { recording, start, stop, result, loading: aiLoading, error: aiError, documents } = useVoice(patient, lang);
 
   useEffect(() => {
     if (result?.medical) {
@@ -141,6 +139,15 @@ export default function VisitForm() {
     }
   }, [bpSys, bpDia, weight, symptoms, patientId, updatePatient, nav, t.saved]);
 
+  const downloadFile = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const gc = (f: string) => (glowField === f ? "animate-glow-field field-glow" : "");
 
   return (
@@ -208,6 +215,45 @@ export default function VisitForm() {
         )}
         {transcript && <div className="w-full mt-2"><VoiceTranscript text={transcript} /></div>}
       </div>
+
+      {/* ── Auto-Filled Documents ───────────────────────────────────────── */}
+      {documents && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="mt-6 p-4 glass-card border-2 border-emerald-500/20"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-xs font-bold uppercase tracking-widest text-emerald-700">Documents Auto-Filled</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => downloadFile(documents.ancCardPDF, "ANC_Card.pdf")}
+              className="flex items-center gap-2 bg-white p-3 rounded-2xl border shadow-sm active:scale-95 transition-transform"
+            >
+              <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center text-red-500">PDF</div>
+              <span className="text-[10px] font-bold text-left">ANC Card</span>
+            </button>
+            <button
+              onClick={() => downloadFile(documents.registerExcel, "RCH_Register.xlsx")}
+              className="flex items-center gap-2 bg-white p-3 rounded-2xl border shadow-sm active:scale-95 transition-transform"
+            >
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500">XLS</div>
+              <span className="text-[10px] font-bold text-left">RCH Register</span>
+            </button>
+            {documents.referralSlipPDF && (
+              <button
+                onClick={() => downloadFile(documents.referralSlipPDF, "Referral.pdf")}
+                className="col-span-2 flex items-center gap-2 bg-red-50 p-3 rounded-2xl border border-red-200 shadow-sm active:scale-95 transition-transform"
+              >
+                <div className="w-8 h-8 rounded-lg bg-red-500 flex items-center justify-center text-white">!</div>
+                <span className="text-[10px] font-bold text-red-700">Referral Slip (Emergency)</span>
+              </button>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Anemia Check (camera pallor screening) ───────────────────── */}
       <div className="mt-4 flex items-center justify-between">
@@ -306,35 +352,6 @@ export default function VisitForm() {
             }`}>
               {salah}
             </p>
-
-            {/* DOWNLOAD DOCUMENTS BUTTONS */}
-            {documents && (
-              <div className="mt-4 pt-4 border-t border-dashed border-primary/20 space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Generated Documents</p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => downloadBlob(documents.ancCardPDF, `ANC_Card_${patient?.name || 'Patient'}.pdf`)}
-                    className="flex items-center gap-2 bg-white border border-primary/20 px-3 py-2 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95 transition-transform"
-                  >
-                    <Download className="w-3.5 h-3.5" /> ANC Card (PDF)
-                  </button>
-                  <button
-                    onClick={() => downloadBlob(documents.registerExcel, `Register_${patient?.name || 'Patient'}.xlsx`)}
-                    className="flex items-center gap-2 bg-white border border-primary/20 px-3 py-2 rounded-xl text-xs font-bold text-primary shadow-sm active:scale-95 transition-transform"
-                  >
-                    <Download className="w-3.5 h-3.5" /> RCH Register (XLS)
-                  </button>
-                  {documents.referralSlipPDF && (
-                    <button
-                      onClick={() => downloadBlob(documents.referralSlipPDF, `Referral_Slip_${patient?.name || 'Patient'}.pdf`)}
-                      className="flex items-center gap-2 bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-xl text-xs font-bold text-destructive shadow-sm active:scale-95 transition-transform"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Referral Slip (PDF)
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
           </motion.div>
         )}
 

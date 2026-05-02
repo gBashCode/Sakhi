@@ -6,11 +6,12 @@ import { triageRisk } from '@/agents/riskAgent';
 import { getNextAction } from '@/agents/copilotAgent';
 import { generateAllDocuments } from '@/agents/documentAgent';
 
-
 export function useVoice(patient, language = 'hi-IN') {
   const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
   const [documents, setDocuments] = useState(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
     // Request mic permission on app start
@@ -21,15 +22,6 @@ export function useVoice(patient, language = 'hi-IN') {
       })
       .catch(() => alert('Mic permission dena zaroori hai. Settings se allow karein.'));
   }, []);
-
-  const downloadBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
 
   const start = async () => {
     if (!permissionGranted) {
@@ -65,15 +57,18 @@ export function useVoice(patient, language = 'hi-IN') {
       const risk = triageRisk({...medical, age: patient?.age});
       const action = getNextAction(patient, null, risk, language === 'hi-IN' ? 'hi' : 'kn');
 
-      const resultData = {text, medical, risk, action};
-      setResult(resultData);
+      setResult({text, medical, risk, action});
 
-      // GENERATE ALL DOCUMENTS INSTANTLY
-      const docs = generateAllDocuments(patient || {}, medical, risk, action);
+      // NEW: GENERATE ALL DOCUMENTS INSTANTLY
+      const docs = generateAllDocuments(patient, medical, risk, action);
       setDocuments(docs);
 
-      // Auto-save to phone (optional, but requested)
-      // downloadBlob(docs.ancCardPDF, `ANC_${medical.patient_name || 'Patient'}.pdf`);
+      // Auto-save to phone
+      downloadBlob(docs.ancCardPDF, `ANC_${medical.patient_name || 'Patient'}_${Date.now()}.pdf`);
+      downloadBlob(docs.registerExcel, `RCH_Register_${Date.now()}.xlsx`);
+      if (docs.referralSlipPDF) {
+        downloadBlob(docs.referralSlipPDF, `Referral_${medical.patient_name || 'Patient'}.pdf`);
+      }
 
       if (risk.level === 'high') {
         speakToAsha(medical.patient_name, `Khatra hai. ${action}`, language);
@@ -94,5 +89,16 @@ export function useVoice(patient, language = 'hi-IN') {
     setLoading(false);
   };
 
-  return {recording, start, stop, result, loading, documents, downloadBlob};
+  return {recording, start, stop, result, loading, documents};
+}
+
+// Helper: Download blob
+export function downloadBlob(blob, filename) {
+  if (!blob) return;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
