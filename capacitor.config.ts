@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'SakhiAI',
   webDir: 'dist',
   server: {
-    androidScheme: 'https', // CRITICAL FIX
+    androidScheme: 'http', // CRITICAL FIX: Allow HTTP requests to backend
     cleartext: true,
     allowNavigation: ['huggingface.co', '*.huggingface.co']
   }

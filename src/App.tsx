@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 import OfflineBanner from "./components/OfflineBanner";
 import AdminDashboard from "./pages/AdminDashboard";
+import Copilot from "./pages/Copilot";
 import { ProtectedRoute, AdminProtectedRoute } from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/metrics" element={<Metrics />} />
+              <Route path="/copilot" element={<Copilot />} />
             </Route>
 
             <Route path="/index" element={<Navigate to="/" replace />} />

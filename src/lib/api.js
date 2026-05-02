@@ -13,3 +13,13 @@ api.interceptors.request.use(async (config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+export const askCopilot = async (message) => {
+  try {
+    const res = await api.post('/api/v1/copilot/chat', { message });
+    return res.data.reply;
+  } catch (error) {
+    console.error('Copilot API error:', error);
+    return 'Sorry, I am offline right now. Please try again later.';
+  }
+};

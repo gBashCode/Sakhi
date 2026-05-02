@@ -9,14 +9,14 @@ class UserCreate(BaseModel):
     pin: str
     name: str
 
-class Token(BaseModel): 
-    access_token: str
-    token_type: str = "bearer"
-    user: "UserOut"
-
 class UserOut(BaseModel):
     id: str
     name: str
     role: str
     class Config: 
         from_attributes = True
+
+class Token(BaseModel): 
+    access_token: str
+    token_type: str = "bearer"
+    user: UserOut

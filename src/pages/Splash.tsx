@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Heart, Mic, ShieldCheck, Download } from "lucide-react";
 import { useEffect, useState } from "react";
-import { initSTT, setSTTProgressCallback } from "@/agents/sttAgent";
+import { initSTT } from "@/agents/sttAgent";
 import { toast } from "sonner";
 
 export default function Splash() {

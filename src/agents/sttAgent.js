@@ -1,179 +1,109 @@
 import { pipeline, env } from '@xenova/transformers';
 
-// CRITICAL FIX: Disable remote download, use bundled model
+// CRITICAL: Disable remote download. Force local APK files.
 env.allowLocalModels = true;
 env.allowRemoteModels = false; // STOP internet download
-env.useBrowserCache = true;
-env.backends.onnx.wasm.numThreads = 1;
+env.useBrowserCache = false; // Don't use cache, use APK files
+env.backends.onnx.wasm.numThreads = 1; // FIX: 2GB phones crash with 4
 env.backends.onnx.wasm.proxy = false;
-env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
 
 let transcriber = null;
-let modelLoading = false;
-let modelReady = false;
-let progressCallback = null;
-let recognition = null;
-let isListening = false;
-
-export function setSTTProgressCallback(cb) {
-  progressCallback = cb;
-}
-
-export function isModelReady() { return modelReady; }
-
-function getSpeechRecognition() {
-  if (recognition) return recognition;
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    console.error('SpeechRecognition not supported');
-    return null;
-  }
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-  return recognition;
-}
-
-/**
- * transcribeRegional(audioBlob, language)
- * PRIMARY: Uses Android/iOS native speech. 0MB download. 95% accurate.
- */
-export async function transcribeRegional(audioBlob = null, language = 'hi-IN') {
-  console.log('[sttAgent] transcribeRegional started. Lang:', language);
-
-  return new Promise((resolve, reject) => {
-    const rec = getSpeechRecognition();
-    if (!rec) {
-      // Fallback to Whisper immediately if native not supported
-      resolve(transcribeWithWhisper(audioBlob, language.split('-')[0]));
-      return;
-    }
-
-    rec.lang = language;
-    isListening = true;
-
-    rec.onresult = (event) => {
-      const text = event.results[0][0].transcript;
-      const confidence = event.results[0][0].confidence;
-      console.log('ASHA said:', text);
-      isListening = false;
-      resolve({ text: text.trim(), confidence });
-    };
-
-    rec.onerror = (event) => {
-      console.error('Speech error:', event.error);
-      isListening = false;
-      // Fallback to Whisper on error
-      resolve(transcribeWithWhisper(audioBlob, language.split('-')[0]));
-    };
-
-    rec.onend = () => {
-      isListening = false;
-    };
-
-    try {
-      rec.start();
-    } catch (e) {
-      console.warn('Recognition start failed, falling back...');
-      resolve(transcribeWithWhisper(audioBlob, language.split('-')[0]));
-    }
-
-    // Auto-stop after 10s
-    setTimeout(() => {
-      if (isListening) rec.stop();
-    }, 10000);
-  });
-}
-
-/**
- * transcribeOnDevice
- * Alias for UI compatibility
- */
-export async function transcribeOnDevice(audioBlob, lang = 'hindi') {
-  const languageMap = { hindi: 'hi-IN', hi: 'hi-IN', en: 'en-IN', english: 'en-IN', kn: 'kn-IN', kannada: 'kn-IN' };
-  return transcribeRegional(audioBlob, languageMap[lang] || 'hi-IN');
-}
-
-export function stopListening() {
-  if (recognition && isListening) {
-    recognition.stop();
-    isListening = false;
-  }
-}
-
-/**
- * transcribeWithWhisper (Fallback)
- * Only used if Android STT fails or offline with no system engine.
- */
-export async function transcribeWithWhisper(audioBlob, lang = 'hindi') {
-  console.log('[sttAgent] Falling back to Whisper WASM');
-  if (!audioBlob || audioBlob.size === 0) return { text: '', confidence: 0 };
-
-  const stt = await initSTT();
-  if (!stt) return { text: '', confidence: 0 };
-
-  try {
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-    const arrayBuffer = await audioBlob.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    const audioData = audioBuffer.getChannelData(0);
-
-    // Boost volume
-    for (let i = 0; i < audioData.length; i++) {
-      audioData[i] *= 2.0;
-    }
-
-    const whisperLang = lang.startsWith('en') ? 'english' : (lang.startsWith('kn') ? 'kannada' : 'hindi');
-
-    const output = await stt(audioData, {
-      language: whisperLang,
-      task: 'transcribe',
-      chunk_length_s: 30,
-      initial_prompt: "Patient name, BP 120/80, vajan 60kg, fever, swelling."
-    });
-
-    return {
-      text: output.text.trim(),
-      confidence: output.chunks?.[0]?.confidence || 0.8
-    };
-  } catch (e) {
-    console.error('[sttAgent] Whisper failed:', e);
-    return { text: '', confidence: 0 };
-  }
-}
+let modelStatus = 'loading'; // 'loading' | 'ready' | 'error'
 
 export async function initSTT() {
   if (transcriber) return transcriber;
-  if (modelLoading) {
-    while(modelLoading) await new Promise(r => setTimeout(r, 100));
-    return transcriber;
-  }
-  modelLoading = true;
-  console.log('Loading bundled AI model from APK...');
+
   try {
-    // FIX: Load from /models/ folder inside APK
+    console.log('Loading Whisper from APK assets...');
+    modelStatus = 'loading';
+
+    // FIX: Load from bundled /models/ folder in APK
     transcriber = await pipeline(
       'automatic-speech-recognition',
-      '/models/whisper-small.hi', // Local path
+      '/models/whisper-small.hi', // Local path in APK
       {
         quantized: true,
-        progress_callback: (p) => { if (progressCallback) progressCallback(p); }
+        progress_callback: (p) => console.log('Model loading:', p)
       }
     );
-    modelReady = true;
-    console.log('Model loaded from APK ✅');
+
+    modelStatus = 'ready';
+    console.log('Whisper ready from APK ✅');
   } catch (e) {
-    console.error('Bundled model failed:', e);
+    modelStatus = 'error';
+    console.error('Failed to load bundled model:', e);
+    transcriber = null;
   }
-  modelLoading = false;
   return transcriber;
 }
 
+// Start loading when app opens
 if (typeof window !== 'undefined') {
   initSTT();
-  // @ts-ignore
-  window.initSTT = initSTT;
-  // @ts-ignore
-  window.transcribeRegional = transcribeRegional;
+}
+
+export async function transcribeOffline(audioBlob) {
+  const stt = await initSTT();
+  if (!stt) throw new Error('AI model not found in app. Reinstall APK.');
+
+  // Assuming audioBlob is a WebM/WAV, we need to decode it to Float32Array
+  const arrayBuffer = await audioBlob.arrayBuffer();
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+  const audioData = audioBuffer.getChannelData(0);
+
+  const output = await stt(audioData, {
+    language: 'hindi',
+    task: 'transcribe',
+    chunk_length_s: 15,
+    stride_length_s: 3,
+    return_timestamps: false,
+  });
+  return output.text.trim();
+}
+
+export function getModelStatus() { return modelStatus; }
+
+export function isModelReady() { return modelStatus === 'ready'; }
+
+export function stopListening() {
+  // Not strictly needed for the offline pipeline logic with MediaRecorder
+}
+
+// 🔄 PART 3: FRONTEND FALLBACK TO BACKEND
+const API_URL = 'https://sakhi-api.up.railway.app';
+
+export async function transcribeWithFallback(audioBlob) {
+  // 1. Try offline first
+  try {
+    if (getModelStatus() === 'ready') {
+      return await transcribeOffline(audioBlob);
+    }
+  } catch (e) {
+    console.log('Offline AI failed, trying server...');
+  }
+
+  // 2. Fallback to server if online
+  if (navigator.onLine) {
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'audio.webm');
+
+      const res = await fetch(`${API_URL}/api/transcribe`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      return data.text;
+    } catch (e) {
+      throw new Error('Server bhi fail. Internet check karo.');
+    }
+  }
+
+  throw new Error('Offline AI not ready aur internet nahi hai');
+}
+
+export async function transcribeRegional(audioBlob, lang) {
+  // Backwards compatibility if called directly
+  return await transcribeWithFallback(audioBlob);
 }

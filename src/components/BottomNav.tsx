@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Home, Bell, User, Users } from "lucide-react";
+import { Home, Bell, User, Users, Bot } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useT } from "@/hooks/useT";
 import { useStore } from "@/lib/store";
@@ -12,6 +12,7 @@ export default function BottomNav() {
   const tabs = [
     { to: "/home", icon: Home, label: t.home },
     { to: "/patients", icon: Users, label: t.patients },
+    { to: "/copilot", icon: Bot, label: "Copilot" },
     { to: "/alerts", icon: Bell, label: t.alerts, badge: 0 },
     { to: "/profile", icon: User, label: t.profile },
   ];
