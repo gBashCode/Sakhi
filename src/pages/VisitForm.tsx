@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Save, Activity, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
+import { ArrowLeft, Sparkles, Save, User, Calendar, Activity, Volume2, Mic, Heart, AlertTriangle, CheckCircle2, Download } from "lucide-react";
 
 import { useT } from "@/hooks/useT";
 import { useStore, type Risk } from "@/lib/store";
@@ -207,6 +207,36 @@ export default function VisitForm() {
           </div>
         )}
         {transcript && <div className="w-full mt-2"><VoiceTranscript text={transcript} /></div>}
+        
+        {/* FALLBACK: KEYBOARD VOICE TYPING */}
+        <div className="mt-4 text-center">
+          <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Problem with AI? Use Phone Mic:</p>
+          <button
+            onClick={() => {
+              const input = document.getElementById('keyboard-fallback-form') as HTMLTextAreaElement;
+              input.focus();
+            }}
+            className="bg-secondary/50 border border-border px-4 py-2 rounded-2xl text-xs font-bold text-foreground flex items-center gap-2 mx-auto"
+          >
+            <Mic className="w-3 h-3" /> Tap to use Keyboard Mic
+          </button>
+          <textarea
+            id="keyboard-fallback-form"
+            className="opacity-0 h-0 w-0 absolute overflow-hidden"
+            placeholder="Talk to your keyboard mic..."
+            onChange={(e) => setTranscript(e.target.value)}
+            onBlur={() => {
+              if (transcript) {
+                // useVoice process logic
+                const parsed = parseMedical(transcript);
+                if (parsed.bp_sys) setBpSys(String(parsed.bp_sys));
+                if (parsed.bp_dia) setBpDia(String(parsed.bp_dia));
+                if (parsed.weight_kg) setWeight(String(parsed.weight_kg));
+                if (parsed.symptoms?.length) setSymptoms(parsed.symptoms.join(", "));
+              }
+            }}
+          />
+        </div>
       </div>
 
       {/* ── Anemia Check (camera pallor screening) ───────────────────── */}

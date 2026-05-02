@@ -5,12 +5,15 @@ import { parseMedical } from '@/agents/nerAgent';
 import { triageRisk } from '@/agents/riskAgent';
 import { getNextAction } from '@/agents/copilotAgent';
 import { generateAllDocuments } from '@/agents/documentAgent';
+import { saveToPhone } from '@/lib/filesystem';
 
 
 export function useVoice(patient, language = 'hi-IN') {
   const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
   const [documents, setDocuments] = useState(null);
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
     // Request mic permission on app start
@@ -22,13 +25,8 @@ export function useVoice(patient, language = 'hi-IN') {
       .catch(() => alert('Mic permission dena zaroori hai. Settings se allow karein.'));
   }, []);
 
-  const downloadBlob = (blob, filename) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadBlob = async (blob, filename) => {
+    await saveToPhone(blob, filename);
   };
 
   const start = async () => {

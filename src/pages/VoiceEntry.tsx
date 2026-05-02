@@ -240,6 +240,36 @@ export default function VoiceEntry() {
                 <VoiceTranscript text={transcript} />
               </div>
             )}
+
+            {/* FALLBACK: KEYBOARD VOICE TYPING */}
+            <div className="mt-4 text-center">
+              <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Problem with AI? Use Phone Mic:</p>
+              <button
+                onClick={() => {
+                  const input = document.getElementById('keyboard-fallback') as HTMLTextAreaElement;
+                  input.focus();
+                }}
+                className="bg-secondary/50 border border-border px-4 py-2 rounded-2xl text-xs font-bold text-foreground flex items-center gap-2 mx-auto"
+              >
+                <Mic className="w-3 h-3" /> Tap to use Keyboard Mic
+              </button>
+              <textarea
+                id="keyboard-fallback"
+                className="opacity-0 h-0 w-0 absolute overflow-hidden"
+                placeholder="Talk to your keyboard mic..."
+                onChange={(e) => {
+                  setTranscript(e.target.value);
+                  // Auto-submit after 2s of no typing
+                }}
+                onBlur={() => {
+                  if (transcript) {
+                    const parsed = parseMedical(transcript);
+                    setMedicalData((prev: any) => ({ ...prev, ...filterByField(parsed, QUESTIONS[qIndex].field) }));
+                    setTimeout(() => setQIndex(prev => prev + 1), 500);
+                  }
+                }}
+              />
+            </div>
           </div>
         )}
 
