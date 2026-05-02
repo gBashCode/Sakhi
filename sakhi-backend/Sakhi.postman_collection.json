@@ -1,0 +1,148 @@
+{
+  "info": {
+    "name": "Sakhi API Hackathon Fallback",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health Check (Wake up Render)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{BASE_URL}}/",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            ""
+          ]
+        }
+      }
+    },
+    {
+      "name": "2. Login ASHA",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"9999999999\",\n  \"pin\": \"1234\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/auth/login",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "3. Sync Visits (High Risk)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ASHA_TOKEN}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"visits\": [\n    {\n      \"client_id\": \"{{$guid}}\",\n      \"patient_id\": \"00000000-0000-0000-0000-000000000000\",\n      \"bp_sys\": 150,\n      \"risk_level\": \"high\",\n      \"device_ts\": \"2026-05-02T10:00:00Z\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/sync",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "sync"
+          ]
+        }
+      }
+    },
+    {
+      "name": "4. Login ANM / PHC",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"7777777777\",\n  \"pin\": \"1234\"\n}"
+        },
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/auth/login",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      }
+    },
+    {
+      "name": "5. Get Live Alerts (ANM)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ANM_TOKEN}}"
+          }
+        ],
+        "url": {
+          "raw": "{{BASE_URL}}/api/v1/alerts/phc",
+          "host": [
+            "{{BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "alerts",
+            "phc"
+          ]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "ASHA_TOKEN",
+      "value": "paste-asha-token-here"
+    },
+    {
+      "key": "ANM_TOKEN",
+      "value": "paste-anm-token-here"
+    }
+  ]
+}
