@@ -1,11 +1,17 @@
 import { pipeline, env } from '@xenova/transformers';
 
-env.allowLocalModels = true;
-env.useBrowserCache = true;
+// ── Environment Configuration ──────────────────────────────────────────────
+env.allowLocalModels = false;
 env.allowRemoteModels = true;
+env.useBrowserCache = true;
 env.remoteHost = 'https://huggingface.co';
-env.backends.onnx.wasm.numThreads = 1; // CRITICAL: 2GB phones crash with 4 threads
-env.backends.onnx.wasm.proxy = false; // CRITICAL: Disable workers on low RAM
+
+// CRITICAL: 2GB phones crash with multiple threads or proxy workers
+env.backends.onnx.wasm.numThreads = 1;
+env.backends.onnx.wasm.proxy = false;
+
+// Ensure WASM files are fetched from CDN
+env.backends.onnx.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/';
 
 let transcriber = null;
 let modelLoading = false;
@@ -14,42 +20,46 @@ let progressCallback = null;
 
 export function setSTTProgressCallback(cb) {
   progressCallback = cb;
+  // If model already ready, trigger it immediately
+  if (modelReady && cb) cb({ status: 'ready' });
 }
+
+export function isModelReady() { return modelReady; }
 
 export async function initSTT() {
   if (transcriber) {
     if (progressCallback) progressCallback({ status: 'ready' });
     return transcriber;
   }
+
   if (modelLoading) {
     while(modelLoading) await new Promise(r => setTimeout(r, 100));
-    if (progressCallback) progressCallback({ status: 'ready' });
     return transcriber;
   }
 
   modelLoading = true;
-  console.log('Sakhi AI: Loading Whisper model... 40MB');
+  console.log('[sttAgent] Initializing Whisper model... 40MB');
 
   try {
-    // FIX: Use quantized tiny model - 40MB not 150MB. Works on 2GB RAM
+    // Using whisper-tiny (standard) - 40MB quantized
     transcriber = await pipeline(
       'automatic-speech-recognition',
-      'Xenova/whisper-tiny.hi', // tiny = 40MB, base = 150MB crashes 2GB phones
+      'Xenova/whisper-tiny',
       {
         quantized: true,
         progress_callback: (p) => {
           if (progressCallback) progressCallback(p);
           if (p.status === 'progress') {
-            console.log(`Model: ${Math.round(p.progress)}%`);
+            console.log(`[sttAgent] Loading: ${Math.round(p.progress)}%`);
           }
         }
       }
     );
     modelReady = true;
-    console.log('Sakhi AI: Model ready ✅');
+    console.log('[sttAgent] Model ready ✅');
     if (progressCallback) progressCallback({ status: 'ready' });
   } catch (e) {
-    console.error('STT load failed:', e);
+    console.error('[sttAgent] Model load failed:', e);
     modelReady = false;
     transcriber = null;
   }
@@ -57,28 +67,25 @@ export async function initSTT() {
   return transcriber;
 }
 
-// CRITICAL FIX: Preload when app opens, not on mic click
+// Global exposure for console testing
 if (typeof window !== 'undefined') {
   // @ts-ignore
   window.initSTT = initSTT;
   // @ts-ignore
-  window.transcribeOnDevice = transcribeOnDevice;
-  initSTT();
+  window.isModelReady = isModelReady;
 }
 
 export async function transcribeOnDevice(audioBlob) {
-  // FIX: Wait for model if still downloading
   if (!modelReady) {
-    console.log('Waiting for model download...');
+    console.log('[sttAgent] Waiting for model download...');
     await initSTT();
   }
 
   if (!transcriber) {
-    throw new Error('AI model failed. Connect internet once to download.');
+    throw new Error('AI model not loaded.');
   }
 
   try {
-    // Converting to Float32Array 16kHz for better stability on Android browsers
     const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
     const arrayBuffer = await audioBlob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -87,21 +94,17 @@ export async function transcribeOnDevice(audioBlob) {
     const output = await transcriber(audioData, {
       language: 'hindi',
       task: 'transcribe',
-      chunk_length_s: 15, // FIX: Smaller chunks = less RAM
+      chunk_length_s: 15,
       stride_length_s: 3,
-      return_timestamps: true, // Needed for confidence heuristics
+      return_timestamps: true,
     });
-
-    console.log('[sttAgent] Result:', output);
 
     return {
       text: output.text.trim(),
       confidence: output.chunks?.[0]?.confidence || 0.85
     };
   } catch (e) {
-    console.error('Transcribe failed:', e);
-    return '';
+    console.error('[sttAgent] Transcription failed:', e);
+    return { text: '', confidence: 0 };
   }
 }
-
-export function isModelReady() { return modelReady; }
