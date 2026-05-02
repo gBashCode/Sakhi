@@ -1,0 +1,97 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* SevaSaathi AI — Warm earthy healthcare theme */
+    --background: 42 67% 95%;           /* warm cream #FFF8E7 */
+    --foreground: 178 60% 14%;          /* deep teal ink */
+
+    --card: 40 60% 98%;
+    --card-foreground: 178 60% 14%;
+
+    --popover: 40 60% 98%;
+    --popover-foreground: 178 60% 14%;
+
+    --primary: 175 78% 26%;             /* deep teal #0F766E */
+    --primary-foreground: 42 67% 96%;
+    --primary-glow: 172 70% 42%;
+
+    --secondary: 40 55% 90%;
+    --secondary-foreground: 178 60% 14%;
+
+    --muted: 40 35% 88%;
+    --muted-foreground: 178 18% 38%;
+
+    --accent: 19 65% 56%;               /* terracotta #D97745 */
+    --accent-foreground: 42 67% 96%;
+    --accent-soft: 19 70% 92%;
+
+    --destructive: 0 73% 50%;           /* emergency red #DC2626 */
+    --destructive-foreground: 42 67% 96%;
+
+    --success: 152 60% 38%;
+    --success-foreground: 42 67% 96%;
+
+    --warning: 38 90% 50%;
+    --warning-foreground: 178 60% 14%;
+
+    --border: 40 30% 82%;
+    --input: 40 30% 82%;
+    --ring: 175 78% 26%;
+
+    --radius: 1.25rem;
+
+    /* Gradients */
+    --gradient-warm: linear-gradient(160deg, hsl(42 67% 96%) 0%, hsl(40 55% 90%) 100%);
+    --gradient-primary: linear-gradient(135deg, hsl(175 78% 26%) 0%, hsl(172 70% 42%) 100%);
+    --gradient-accent: linear-gradient(135deg, hsl(19 65% 56%) 0%, hsl(28 75% 62%) 100%);
+    --gradient-mic: radial-gradient(circle at 50% 50%, hsl(172 70% 42%) 0%, hsl(175 78% 26%) 60%, hsl(178 60% 14%) 100%);
+    --gradient-hero: linear-gradient(180deg, hsl(42 67% 96%) 0%, hsl(40 55% 92%) 50%, hsl(40 50% 88%) 100%);
+
+    /* Shadows */
+    --shadow-soft: 0 4px 16px -4px hsl(178 60% 14% / 0.08);
+    --shadow-card: 0 10px 32px -12px hsl(178 60% 14% / 0.18);
+    --shadow-glow: 0 0 60px -10px hsl(172 70% 42% / 0.55);
+    --shadow-mic: 0 20px 60px -12px hsl(175 78% 26% / 0.5);
+
+    --transition-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html, body, #root { @apply h-full; }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    background-image: var(--gradient-hero);
+    background-attachment: fixed;
+  }
+  h1, h2, h3, h4 { @apply font-display tracking-tight; }
+}
+
+@layer components {
+  /* Subtle Indian-textile inspired pattern */
+  .pattern-organic {
+    background-image:
+      radial-gradient(circle at 20% 10%, hsl(var(--accent) / 0.08) 0, transparent 40%),
+      radial-gradient(circle at 80% 80%, hsl(var(--primary) / 0.10) 0, transparent 45%),
+      radial-gradient(circle at 50% 50%, hsl(var(--accent-soft)) 0, transparent 60%);
+  }
+  .pattern-dots {
+    background-image: radial-gradient(hsl(var(--primary) / 0.12) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/60 rounded-3xl;
+    box-shadow: var(--shadow-card);
+  }
+
+  .stat-pill {
+    @apply rounded-2xl px-3 py-2 bg-card/70 border border-border/50;
+  }
+}

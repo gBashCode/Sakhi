@@ -1,0 +1,60 @@
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { Phone, ShieldCheck } from "lucide-react";
+import { useStore } from "@/lib/store";
+import { useT } from "@/hooks/useT";
+
+export default function Login() {
+  const nav = useNavigate();
+  const t = useT();
+  const setLoggedIn = useStore((s) => s.setLoggedIn);
+  const [phone, setPhone] = useState("");
+
+  return (
+    <div className="min-h-screen flex flex-col px-6 py-10 pattern-organic">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="w-16 h-16 rounded-2xl bg-gradient-primary flex items-center justify-center shadow-mic">
+          <ShieldCheck className="w-8 h-8 text-primary-foreground" />
+        </div>
+        <h2 className="mt-6 text-3xl font-display text-primary">{t.welcome} 🙏</h2>
+        <p className="text-muted-foreground mt-1">{t.tagline}</p>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="glass-card mt-8 p-5"
+      >
+        <label className="text-sm font-semibold text-foreground/80">{t.phone}</label>
+        <div className="mt-2 flex items-center gap-3 bg-background/60 rounded-2xl px-4 py-4 border border-border">
+          <Phone className="w-5 h-5 text-primary" />
+          <span className="font-semibold text-foreground">+91</span>
+          <input
+            inputMode="numeric"
+            maxLength={10}
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+            placeholder="98765 43210"
+            className="flex-1 bg-transparent outline-none text-lg tracking-wider"
+          />
+        </div>
+      </motion.div>
+
+      <div className="flex-1" />
+
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        disabled={phone.length < 10}
+        onClick={() => {
+          setLoggedIn(true);
+          nav("/home");
+        }}
+        className="w-full bg-gradient-primary text-primary-foreground py-5 rounded-3xl font-bold text-lg shadow-mic disabled:opacity-50"
+      >
+        {t.sendOtp}
+      </motion.button>
+    </div>
+  );
+}
