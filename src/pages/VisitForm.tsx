@@ -13,6 +13,7 @@ import MicButton from "@/components/MicButton";
 import VoiceTranscript from "@/components/VoiceTranscript";
 import RiskBadge from "@/components/RiskBadge";
 import AnemiaChecker from "@/components/AnemiaChecker";
+import TranslatePanel from "@/components/TranslatePanel";
 import { toast } from "sonner";
 
 // ── Risk engine — thin wrapper that delegates to nerAgent (single source of truth) ──
@@ -340,6 +341,15 @@ export default function VisitForm() {
             />
           </div>
         </div>
+      </div>
+
+      {/* ── Translation: ASHA writes Kannada, ANM sees Hindi ─────────────── */}
+      <div className="mt-4">
+        <TranslatePanel
+          initialText={transcript || symptoms}
+          defaultSrc="kan"
+          defaultTgt="hin"
+        />
       </div>
 
       {/* ── Save button ─────────────────────────────────────────────────── */}
